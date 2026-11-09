@@ -1,0 +1,530 @@
+<div class="col-12 pb-2">
+    <div class="row">
+        <div class="col-11 mb-3">
+            <div class="d-flex align-items-center">
+                <div class="profile-image-div-md">
+                    @if(!empty($user->profile_image))
+                    <img src="{{ url('storage/app/public/' . $user->profile_image) }}" class="img-fluid" alt="Profile Image">
+                @else
+
+                    <img src="{{ getUserImage($user->first_name,$user->last_name) }}" class="img-fluid" alt="Default Image">
+                @endif
+                </div>
+                <div class="ms-2">
+                    <div class="twoline-text-truncate user-name">{{ $user->first_name ??''}} {{$user->last_name ??''}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <nav class="horizontal-tabs-div">
+        <div class="nav nav-tabs horizontal-tabs font-smallsize mb-2" id="nav-tab" role="tablist">
+            <button class="nav-link nav-linkk active" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab" aria-controls="reports" aria-selected="true">Reports</button>
+            <button class="nav-link nav-linkk" id="course-assesments-n-certificates-tab" data-bs-toggle="tab" data-bs-target="#course-assesments-n-certificates" type="button" role="tab" aria-controls="course-assesments-n-certificates" aria-selected="true">Course Assessments & Certificates</button>
+        </div>
+    </nav>
+    <div class="tab-content border-0 mt-0 pl-0 py-0 pr-1 admin-course-det-height height-100vh" id="myTabContent">
+        <div class="tab-pane fade show active border-top-0" id="reports" role="tabpanel" aria-labelledby="reports-tab">
+            <div class="row">
+                <div class="col-12 col-lg-3">
+                    <div class="row">
+                        <div class="col-12 my-2">
+                            <div class="reports-card reports-card1">
+                                <div class="d-flex align-items-center justify-content-start">
+                                    <div class="reports-icon reports-icon1">
+                                    <i class="fa-solid fa-book-open-reader"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <h6>Assigned Courses</h6>
+                                        <h6 class="text-center mb-0">{{$total_courses??'0'}}</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 my-2">
+                            <div class="reports-card reports-card2">
+                                <div class="d-flex align-items-center justify-content-start">
+                                    <div class="reports-icon reports-icon2">
+                                    <i class="fa-solid fa-user-check"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <h6>Completed</h6>
+                                        <h6 class="text-center mb-0">{{$completed_course??'0'}}</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 my-2">
+                            <div class="reports-card reports-card3">
+                                <div class="d-flex align-items-center justify-content-start">
+                                    <div class="reports-icon reports-icon3">
+                                        <i class="fa-solid fa-user-xmark"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <h6>In-Progress</h6>
+                                        <h6 class="text-center mb-0">{{$inprogress_count??'0'}}</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3">
+                    <div class="row">
+                        <div class="col-12 my-2">
+                            <div class="reports-card reports-card4">
+                                <div class="d-flex align-items-center justify-content-start">
+                                    <div class="reports-icon reports-icon4">
+                                    <i class="fa-solid fa-user-slash"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <h6>Pending</h6>
+                                        <h6 class="text-center mb-0">{{$pending_count??'0'}}</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 my-2">
+                            <div class="reports-card reports-card5">
+                                <div class="d-flex align-items-center justify-content-start">
+                                    <div class="reports-icon reports-icon4">
+                                    <i class="fa-solid fa-person-chalkboard"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <h6>Instructor Led</h6>
+                                        <h6 class="text-center mb-0">{{$instructor_lead??'0'}}</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4 offset-lg-1 my-auto">
+                    <div id="bsb-chart-2" class="d-flex align-items-center justify-content-center" style="width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="course-assesments-n-certificates" role="tabpanel" aria-labelledby="course-assesments-n-certificates-tab">
+
+        
+            <div class="row">
+        
+                <div class="col-12 px-0">
+            
+                    <div class="col-12 mt-1">
+                
+                        @foreach ($assessments as $key => $data)
+
+                            <div class="border px-2 py-2 py-md-2 py-lg-3">
+
+                                <div class="accordion accordion-flush"
+                                    id="accordionFlushExample{{ $key }}">
+
+                                    <div class="accordion-item">
+
+                                        <h2 class="accordion-header"
+                                            id="flush-headingOne{{ $key }}">
+
+                                            <div class="row p-2 px-lg-0 align-items-center">
+
+                                                <div class="col-12 col-lg-7 my-auto">
+
+                                                    <div class="d-flex align-items-center">
+
+                                                        <div class="course-image-sm">
+                                                            <img src="{{ url('public/images/course.jpg') }}"
+                                                                class="img-fluid w-100 rounded-3"
+                                                                alt="">
+                                                        </div>
+
+                                                        <div class="ps-2">
+
+                                                        <a href="#" class="pb-1 course-name font-weight-bold">{{ optional($data->course_details)->course_name ?? 'Course Not Found' }}</a>
+
+                                                            <div class="py-1 sub-categories-styles">
+                                                                Online Training
+                                                            </div>
+
+                                                            <div class="py-1 sub-text">
+                                                                Category Name
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="col-12 col-lg-5 d-flex justify-content-end mt-2 mt-lg-0">
+
+                                                    <button class="accordion-button collapsed"
+                                                        type="button"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#flush-collapse{{ $key }}"
+                                                        aria-expanded="false"
+                                                        aria-controls="flush-collapse{{ $key }}">
+
+                                                        View Assessments & Assignments
+
+                                                    </button>
+
+                                                </div>
+
+                                            </div>
+
+                                        </h2>
+
+
+                                        <div id="flush-collapse{{ $key }}"
+                                            class="accordion-collapse collapse"
+                                            aria-labelledby="flush-headingOne{{ $key }}"
+                                            data-bs-parent="#accordionFlushExample{{ $key }}">
+
+                                            <div class="accordion-body p-0">
+
+
+                                            {{-- =====================================================
+                                                ASSESSMENTS
+                                            ====================================================== --}}
+                                            @php
+                                                $courseAssessments = optional($data->course_details)->assessments ?? collect();
+                                                
+                                                // Find assessment with result or fallback to first
+                                                $matchedAssessment = $courseAssessments->first(function($assess) use ($allResults) {
+                                                    return !empty($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
+                                                });
+
+                                                if (!$matchedAssessment && $courseAssessments->isNotEmpty()) {
+                                                    $matchedAssessment = $courseAssessments->first();
+                                                }
+                                                
+                                                $validAssessments = $matchedAssessment ? collect([$matchedAssessment]) : collect();
+                                            @endphp
+
+                                            @foreach ($validAssessments as $assess)
+                                                @php
+                                                    $result_datas = $allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null;
+                                                    
+                                                    $result_html = '';
+                                                    $assessmentStatus = 'Pending';
+
+                                                    if (!empty($result_datas)) {
+                                                        $assessmentStatus = 'Passed';
+                                                        $link = explode('/', $assess->file_path ?? '');
+                                                        $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($result_datas->code ?? '');
+                                                        
+                                                        $result_html = '<a href="javascript:;" data-link="https://assessment.digicat.ai/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '" class="btn btn-sm btn-primary text-nowrap take_result exam-result-btn">View Result</a>';
+                                                    } elseif ($data->status == 3) {
+                                                        // Fallback if course is completed/passed (status 3) but result row lookup missed
+                                                        $assessmentStatus = 'Passed';
+                                                        $link = explode('/', $assess->file_path ?? '');
+                                                        $fallback_code = $assess->id;
+                                                        $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . $fallback_code;
+
+                                                        $result_html = '<a href="javascript:;" data-link="https://assessment.digicat.ai/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '" class="btn btn-sm btn-primary text-nowrap take_result exam-result-btn">View Result</a>';
+                                                    } else {
+                                                        if ($data->status == 1) {
+                                                            $assessmentStatus = 'In Progress';
+                                                        } elseif ($data->status == 2) {
+                                                            $assessmentStatus = 'Not Attended';
+                                                        }
+                                                    }
+                                                @endphp
+
+                                                <div class="row mt-2 mb-3">
+                                                    <div class="col-12">
+                                                        <div class="exam-result-block">
+                                                            {{-- Assessment Name --}}
+                                                            <div>
+                                                                <div class="border-left-3p-b1 ps-2">Assessment Name</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="ml-0 w-100 oneline-text-truncate">
+                                                                        {{ $assess->file_name }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {{-- Status --}}
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="result-styles ml-0">
+                                                                        {{ $assessmentStatus }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {{-- Action --}}
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b3 ps-2">Action</div>
+                                                                <div class="r-data-styles white-space-nowrap">
+                                                                    @if(!empty($result_html))
+                                                                        <span class="ml-0">{!! $result_html !!}</span>
+                                                                        <span class="badge bg-success ms-2">Completed</span>
+                                                                    @else
+                                                                        <span class="text-muted small">Not Attempted Yet</span>
+                                                                    @endif
+
+                                                                    @if($data->status == 3 || $assessmentStatus == 'Passed')
+                                                                        <a href="#"
+                                                                            data-id="{{ $data->id }}"
+                                                                            class="btn btn-primary btn-sm get_certificates exam-result-btn ms-2"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#certificateView">
+                                                                            View Certificate
+                                                                        </a>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+
+
+                                            {{-- =====================================================
+                                                    ASSIGNMENTS / EXAMS
+                                            ====================================================== --}}
+
+                                            {{-- =====================================================
+                                                ASSIGNMENTS / EXAMS (Supports Multiple Attempts)
+                                            ====================================================== --}}
+                                            @foreach($data->course_details->assignment_exam ?? [] as $assignment_exam)
+                                                @php
+                                                    $examId = optional($assignment_exam->assignment_exam_name)->id;
+                                                    $courseId = $data->course_details->id ?? null;
+                                                    $examKey = $examId . '_' . $courseId;
+
+                                                    // Get all attempts for this exam, then find if there is a passed one, otherwise fallback to the latest attempt
+                                                    $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
+                                                    
+                                                    // Prioritize a successful/passed attempt among the multiple tries, otherwise take the absolute latest attempt
+                                                    $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
+                                                        $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
+                                                        $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
+                                                        $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
+                                                        return $pct >= 50; // assuming 50 is pass percentage
+                                                    }) ?? $attemptsCollection->sortByDesc('id')->first();
+
+                                                    $assignedAnswerCount = 0;
+                                                    $assignedQuestionMarksCount = 0;
+                                                    $percentage = 0;
+                                                    $passPercentage = 50;
+                                                    $examStatus = 'Pending';
+
+                                                    if ($assignedExam) {
+                                                        $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
+                                                        $assignedQuestionMarksCount = (float) ($allQuestionMarks[$assignedExam->exam_id] ?? 0);
+
+                                                        if ($assignedQuestionMarksCount > 0) {
+                                                            $percentage = round(($assignedAnswerCount / $assignedQuestionMarksCount) * 100, 2);
+                                                        }
+
+                                                        if (isset($assignedExam->exam_result) && $assignedExam->exam_result == 'Pending') {
+                                                            $examStatus = 'Pending';
+                                                        } elseif ($percentage >= $passPercentage) {
+                                                            $examStatus = 'Passed';
+                                                        } else {
+                                                            $examStatus = 'Failed'; // Shows failed for earlier attempts if they haven't passed yet
+                                                        }
+                                                    }
+                                                @endphp
+
+                                                <div class="row mt-3 mb-3">
+                                                    <div class="col-12">
+                                                        <div class="exam-result-block">
+                                                            <div>
+                                                                <div class="border-left-3p-b1 ps-2">Assignment Name</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="ml-0 w-100 oneline-text-truncate">
+                                                                        {{ optional($assignment_exam->assignment_exam_name)->name ?? 'N/A' }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="result-styles ml-0">
+                                                                        {{ $examStatus }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b3 ps-2">Score</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="result-styles ml-0">
+                                                                        {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b4 ps-2">Percentage</div>
+                                                                <div class="r-data-styles">
+                                                                    <span class="result-styles ml-0">
+                                                                        {{ number_format($percentage, 2) }}%
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                <div class="border-left-3p-b5 ps-2">Action</div>
+                                                                <div class="r-data-styles">
+                                                                    @if($assignedExam && isset($assignedExam->exam_result) && $assignedExam->exam_result == 'Pending')
+                                                                        <a href="{{ url('view_attempted_exam') }}?assigned_id={{ $data->id ?? '' }}&course_id={{ optional($data->course_details)->id ?? '' }}&type=lead&exam_id={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                            class="btn btn-sm btn-outline-primary text-nowrap"
+                                                                            target="_blank">
+                                                                            Evaluate Exam
+                                                                        </a>
+                                                                    @elseif($assignedExam)
+                                                                        <a href="{{ route('exams.LeadResultview') }}?course_id={{ optional($data->course_details)->id ?? '' }}&exam_name={{ optional($assignment_exam->assignment_exam_name)->exam_code ?? '' }}&ex_c={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                            class="btn btn-sm btn-primary text-nowrap exam-result-btn"
+                                                                            target="_blank">
+                                                                            Evaluation Completed
+                                                                        </a>
+
+                                                                        @if(!empty($assignedExam->evaluation_completed_date))
+                                                                            <p class="mb-0 mt-1">
+                                                                                On : {{ \Carbon\Carbon::parse($assignedExam->evaluation_completed_date)->format('d-m-Y') }}
+                                                                            </p>
+                                                                        @endif
+                                                                    @else
+                                                                        <span class="text-muted">Not Attempted</span>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        @endforeach
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="certificateView" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="certificateViewLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="certificateViewLabel">Course completion certificate</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body certificate_html">
+            
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="assessmentView" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="assessmentViewLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="assessmentViewLabel">Course Name</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn cancel-btn" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+ <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script type="text/javascript">
+
+    $(document).ready(function() {
+        
+        var chartInitialized = false;
+
+        $('.take_result').click(function(){
+            var link = $(this).data('link');
+            window.open(link, "popupWindow", "width=1200, height=800, scrollbars=yes");
+        });
+
+
+        $('body').on('click', '.get_certificates', function(){
+            var assign_id = $(this).data('id');
+            $.ajax({
+                type: "GET",
+                url: "{{ url('get_certificate') }}",
+                data: {
+                    assign_id: assign_id
+                },
+                dataType: "html",
+                success: function(response) {
+                    $('.certificate_html').html(response);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error saving video time:", error);
+                }
+            });
+        });
+
+        
+        if (!chartInitialized) {
+            chartInitialized = true;
+            const e = {
+                init() {
+                    new ApexCharts(document.querySelector("#bsb-chart-2"), {
+                        series: [{{$completed_course}}, {{$inprogress_count}}, {{$pending_count}}, {{$instructor_lead}}],
+                        labels: ["Completed", "In-Progress", "Pending", "Instructor Led"],
+                        legend: {
+                            show: false 
+                        },
+                        theme: { palette: "palette1" },
+                        chart: { type: "donut" },
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    labels: {
+                                        show: false 
+                                    }
+                                }
+                            }
+                        },
+                        colors: [
+                            "#cfcbc9", 
+                            "#d3e1df", 
+                            "#eadccf",
+                            "#e0d4d5"
+                        ],
+                    }).render();
+                },
+            };
+
+            
+            function t() {
+                e.init();
+            }
+
+          
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", t);
+            } else {
+                t();
+            }
+        }
+    });
+
+</script>

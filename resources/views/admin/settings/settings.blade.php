@@ -1,0 +1,7 @@
+@include('layouts.admin.header')
+@include('admin.settings.logo_application')
+@include('admin.settings.datetime_currency')
+@include('admin.settings.conferences')
+@include('admin.settings.announcements')
+@include('admin.settings.session')
+@include('layouts.admin.footer')

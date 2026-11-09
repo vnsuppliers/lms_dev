@@ -1,0 +1,103 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+	html, body{
+		margin:0;
+		padding:0;
+		height: 100%;
+		overflow: hidden;
+	}
+	#sc_content{
+		margin:0;
+		padding:0;
+		height: 100%;
+	}
+	#scorm-content-frame{
+		height: 100%;
+	}
+	#scorm-content-frame.iOS{
+		overflow:auto;
+		-webkit-overflow-scrolling:touch;
+	}
+	
+</style>
+<script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+<script src="https://code.jquery.com/jquery-migrate-3.4.1.js"></script>
+<script>
+	// $(document).ready(function(){
+	// 	let isIt_iOS = (/iPad|iPhone|iPod/.test(navigator.platform) ||(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !window.MSStream;
+	
+	// 	if(isIt_iOS){
+	// 		$('#scorm-content-frame').addClass('iOS');
+	// 	}
+	// });
+
+	launchURL = null;
+	
+	$(function() {
+		function receiveMessage(e) {
+
+
+			launchURL = e.data.scorm.launch_url;
+
+			// Helpers:
+			scormPost = function(send_values){
+				parent.postMessage({'sendValues' : send_values, 'launchURL' : launchURL}, '*');
+			}
+
+
+			// Execute:
+			tl_sco_data = e.data;
+
+			// Load scorm.js:
+
+			$.getScript("public/js/scormplayer.js", function(data, textStatus, jqxhr){
+
+				// Load scorm content:
+				scorm_data = tl_sco_data.scorm;
+
+				scormContentFrame =
+					'<iframe id="sc_content"' +
+					' frameborder="' + (scorm_data.frameBorder ? 1 : 0) + '"' +
+
+					' height="' + 550 + '"' +
+					' src="' + scorm_data.src + '"' +
+
+					' width="' + scorm_data.width + '"' +
+					' allowfullscreen' +
+				'></iframe>';
+
+				window.removeEventListener('message', receiveMessage); // Remove listener as it has done it's job - stop listening to any messages (possibly from the SCORM content itself)
+				$('#scorm-content-frame').html(scormContentFrame);
+
+				$(window).on('unload', function(){
+					$('#sc_content').attr('src', '').remove(); // .remove() without emptying the iframe content, sometimes crashes ie
+				});
+
+				$(window).on('beforeunload', function(){
+					$('#sc_content').attr('src', '').remove(); // .remove() without emptying the iframe content, sometimes crashes ie
+				});
+				
+				if ('onpagehide' in window){
+					console.log('-2.');
+					window.addEventListener('pagehide', function(){
+						$('#sc_content').attr('src', '').remove(); // .remove() without emptying the iframe content, sometimes crashes ie
+					}, false);
+				}
+				
+			});
+		}
+
+		// Acquire scorm state data:
+		window.addEventListener('message', receiveMessage);
+	});
+</script>
+</head>
+<body>
+	<div id="scorm-content-frame"></div>
+</body>
+</html>

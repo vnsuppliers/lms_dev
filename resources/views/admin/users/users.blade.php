@@ -1,0 +1,6 @@
+@include('layouts.admin.header')
+@include('admin.users.adduser')
+@include('admin.users.viewuser')
+@include('admin.users.addgroup')
+@include('admin.users.viewgroup')
+@include('layouts.admin.footer')

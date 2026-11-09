@@ -1,0 +1,6 @@
+@include('layouts.admin.header')
+@include('admin.Roles_Permissions.addrole')
+@include('admin.Roles_Permissions.permission')
+@include('admin.Roles_Permissions.view_roles')
+@include('admin.Roles_Permissions.view_permission')
+@include('layouts.admin.footer')

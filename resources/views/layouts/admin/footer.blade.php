@@ -1,0 +1,167 @@
+</div>
+</div></div>
+        <!-- content-wrapper ends -->
+
+        
+        <!-- partial -->
+      </div>
+      <!-- main-panel ends -->
+
+      <!-- partial:../../partials/_footer.html -->
+        <!-- <footer class="footer">
+          <div class="w-100 clearfix">
+             <span class="text-muted d-block text-center text-sm-left d-sm-inline-block">Copyright © 2023-24 <a href="" target="_blank">Digicat.ai</a>. All rights reserved.</span>
+             <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Hand-crafted & made with <i class="mdi mdi-heart-outline text-danger"></i></span> 
+          </div>
+        </footer> -->
+    </div>
+    <!-- page-body-wrapper ends -->
+  </div>
+  <!-- container-scroller -->
+  <!-- plugins:js -->
+
+  <script src="{{asset('public/vendors/js/vendor.bundle.base.js')}}"></script>
+  <script src="{{asset('public/vendors/js/vendor.bundle.addons.js')}}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js" integrity="sha384-7+zCNj/IqJ95wo16oMtfsKbZ9ccEh31eOz1HGyDuCQ6wgnyJNSYdrPa03rtR1zdB" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js" integrity="sha384-QJHtvGhmr9XOIpI6YVutG+2QOK9T+ZnN4kzFN1RtK3zEFEIsxhlmWl5/YESvpZ13" crossorigin="anonymous"></script> -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- endinject -->
+  <!-- Plugin js for this page-->
+  <!-- End plugin js for this page-->
+  <!-- inject:js -->
+  <script src="{{asset('public/js/off-canvas.js')}}"></script>
+  <script src="{{asset('public/js/hoverable-collapse.js')}}"></script>
+  <script src="{{asset('public/js/template.js')}}"></script>
+  <script src="{{asset('public/js/settings.js')}}"></script>
+  <script src="{{asset('public/js/todolist.js')}}"></script>
+
+  
+  <!-- endinject -->
+  <!-- Custom js for this page-->
+  <script src="{{asset('public/js/profile-demo.js')}}"></script>
+  <!-- End custom js for this page-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js" integrity="sha512-u3fPA7V8qQmhBPNT5quvaXVa1mnnLSXUep5PS1qo5NRzHwG19aHmNJnj1Q8hpA/nBWZtZD4r4AX6YOt5ynLN2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
+  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.js"></script>
+   <script src="{{asset('public/js/jquery.toast.js')}}"></script>
+   <script src="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.3/jquery-ui.js"></script>
+  <script src="{{asset('public/js/custom.js')}}"></script>
+
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/js/bootstrap-multiselect.min.js"></script>
+
+<!-- Filters dropdown script -->
+
+ <script>
+    $(document).ready(function() {
+        const $filterBtn = $("body").find('.filterBtn');
+        const $filterMenu = $("body").find('.filterMenu');
+        const $submitBtn = $("body").find('.submitBtn');
+
+        // Toggle the dropdown when clicking the filter button
+        $("body").on('click','.filterBtn', function(event) { 
+            event.stopPropagation(); // Prevent the event from bubbling up and causing the dropdown to close
+
+            // Toggle the visibility of the dropdown menu
+            $(this).parents('form').find('.filterMenu').toggle();
+        });
+
+        // Close the dropdown when clicking the submit button inside the dropdown
+        $("body").on('click','.submitBtn', function() {
+            $(this).parents('form').find('.filterMenu').hide();
+        });
+
+        // Prevent the dropdown from closing when clicking inside it
+        $("body").on('click','.filterMenu', function(event) {
+            event.stopPropagation(); // Prevents closing the dropdown when clicking inside it
+        });
+
+        // Close the dropdown when clicking anywhere outside
+        $(document).on('click', function(event) { 
+            $("body").find('.filterMenu').each(function(){
+                if (!$(this).is(event.target) && !$(this).has(event.target).length && !$(this).parents('form').find('.filterBtn').is(event.target)) {
+                     $("body").find('.filterMenu').hide();
+                }
+            });
+        });
+    });
+</script>
+
+  <script>
+      new DataTable('.DataTablee');
+  </script>
+  <script>
+    $(document).ready(function() {
+
+         $('.theme-loader').hide();
+
+    
+var readURL = function(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+            $('.profile-pic').attr('src', e.target.result);
+        }
+
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+
+$(".file-upload").on('change', function(){
+    readURL(this);
+});
+
+$(".upload-button").on('click', function() {
+   $(".file-upload").click();
+});
+});
+  </script>
+
+<script>
+    // Function to check if the table has data
+    function checkTableData() {
+        const table = document.getElementById('data-table');
+        const tableContainer = document.getElementById('table-container');
+        
+        // Check if the table has rows
+        if(table !== null){
+            if (table.rows.length > 6) {
+                tableContainer.classList.remove('height-100vh');
+                tableContainer.classList.add('auto-height');
+            } else {
+                
+                tableContainer.classList.remove('auto-height');
+                tableContainer.classList.add('height-100vh');
+            }
+        }
+    }
+    
+    // Run the function on page load
+    window.onload = checkTableData;
+
+
+
+        $(document).ready(function() {
+            $('.multiple_select').multiselect({
+                buttonWidth : '200px',
+                includeSelectAllOption : true,
+                select_all:true,
+                nonSelectedText: 'Select All'
+              });
+            $('.multiselect').on('click',function(){
+                $('.multiselect-container').toggle();
+            });
+           
+        });
+ $('body').on('click','.selected-dropdownn-btn',function(){
+                $(this).parents('.dropdown').find('.selected-dropdownn').toggle();
+            });
+        
+</script>
+{{-- @include('layouts.partials.browser-close-tracker') --}}
+</body>
+</html>

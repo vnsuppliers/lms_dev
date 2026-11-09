@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @php
+    $site = \App\Models\Site::select('site_name','banner_image', 'favicon', 'hide_sitename')
+    ->orderBy('updated_at', 'desc')->first();
+    @endphp
+    @if($site && $site->favicon)
+    <link rel="shortcut icon" href="{{ asset('storage/app/public/'.$site->favicon) }}" type="image/x-icon">
+    @endif
+    <title>{{ $site->site_name }}</title>
+
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{{asset('public/vendors/css/vendor.bundle.base.css')}}">
+    <link rel="stylesheet" href="{{asset('public/vendors/css/vendor.bundle.addons.css')}}">
+    <link rel="stylesheet" href="{{asset('public/vendors/css/bootstrap.min.css')}}">
+    <link href="{{asset('public/vendors/css/bootstrap-icons.css')}}" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- endinject -->
+    <!-- inject:css -->
+    <link rel="stylesheet" href="{{ asset('public/css/horizontal-layout/style.css')}}">
+    <link rel="stylesheet" href="{{ asset('public/css/horizontal-layout/lms.css')}}">
+    <link rel="stylesheet" href="{{ asset('public/css/jquery.toast.css')}}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{asset('public/js/jquery.toast.js')}}"></script>
+
+    <!-- endinject -->
+    <link rel="shortcut icon" href="" />
+</head>
+<style>
+    .sticky-top {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 9999;
+    }
+
+    .page-body {
+        background: #fff;
+    }
+
+    @media (min-width: 992px) {
+        .page-body {
+            padding-top: 10px !important;
+            margin-top: 0 !important;
+        }
+
+        .sidepop {
+            top: 58px !important;
+            height: calc(100vh - 58px) !important;
+            margin-top: 0 !important;
+        }
+
+        .user-desktop-header-row {
+            flex-wrap: nowrap;
+            align-items: stretch;
+            min-height: 58px;
+            justify-content: space-between;
+        }
+
+        .user-header-brand {
+            flex: 0 0 9%;
+            width: 9%;
+            max-width: 9%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
+        }
+
+        .user-header-brand .site-logo {
+            display: block;
+            width: auto;
+            max-width: 100%;
+            max-height: 46px;
+            object-fit: contain;
+        }
+
+        .user-header-brand .navbar-brand {
+            margin-right: 0;
+            max-width: 100%;
+        }
+
+        .user-header-navigation {
+            flex: 1 1 auto;
+            width: auto;
+            min-width: 0;
+        }
+
+        .user-header-navigation .nav-main-tabss {
+            min-height: 58px;
+            justify-content: flex-start !important;
+        }
+
+        .user-header-navigation .admin-nav-menu,
+        .user-header-navigation .btn-primaryy-lite {
+            display: inline-flex;
+            align-items: center;
+            min-height: 58px;
+            min-width: 0;
+            /* margin-right: 0 !important; */
+            padding: 6px 6px !important;
+            font-size: 14px !important;
+            line-height: 1.2 !important;
+            white-space: nowrap;
+        }
+
+        .user-header-profile {
+            flex: 0 0 280px;
+            width: 280px;
+            max-width: 280px;
+            position: relative;
+            z-index: 2;
+            background: #fff;
+        }
+
+        .user-header-profile > div,
+        .user-header-profile > div > .row {
+            height: 100%;
+        }
+
+        .user-header-profile .header-profile-details {
+            min-width: 0;
+        }
+
+        .user-header-profile .header-profile-details > .d-flex {
+            min-width: 0;
+        }
+
+        .user-header-profile .header-profile-text {
+            min-width: 0;
+            line-height: 1.15;
+        }
+
+        .user-header-profile .header-profile-name-text,
+        .user-header-profile .header-profile-text .text-muted {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    @media (min-width: 992px) and (max-width: 1999.98px) {
+        .user-header-navigation .admin-nav-menu,
+        .user-header-navigation .btn-primaryy-lite {
+            padding: 6px 4px !important;
+            font-size: 13.5px !important;
+        }
+
+        .user-header-navigation .admin-nav-menu i,
+        .user-header-navigation .btn-primaryy-lite i {
+            margin-right: 0.25rem !important;
+        }
+
+        .user-header-profile {
+            flex-basis: 260px;
+            width: 260px;
+            max-width: 260px;
+        }
+
+        .user-header-navigation .logged-as-switcher {
+            padding-left: 0.3rem;
+            padding-right: 0.3rem;
+        }
+
+        .user-header-navigation .logged-as-label {
+            display: none;
+        }
+    }
+  
+</style>
+<body>
+    <div class="container-fluid header-bg sticky-top d-none d-lg-block">
+        <div class="row px-2 user-desktop-header-row">
+            <div class="col-4 col-md-2 col-lg-1p5 my-auto user-header-brand">
+                @if($site && isset($site->banner_image))
+                    <img src="{{ asset('storage/app/public/'.$site->banner_image) }}" class="site-logo" alt="Logo" /> @endif @if($site->hide_sitename==0)
+                    <a class="navbar-brand brand-logo" href="{{ url('organizationdashboard') }}">
+                        <div id="headerSiteName">{{ $site->site_name ?? '' }}</div>
+                    </a>
+                @endif
+            </div>
+            @if ($errors->any())
+                <div class="row">
+                    @foreach ($errors->all() as $error)
+                    <div class="col-12 my-3">
+                        <p class="alert alert-danger">{!! $error !!}</p>
+                    </div>
+                    @endforeach
+                </div>
+            @endif
+            <div class="col-12 col-md-4 col-lg-8p5 my-auto user-header-navigation">
+                <div class="tab-content border-0" id="v-pills-tabContent">
+                    <div class="tab-pane fade show active" id="v-pills1" role="tabpanel" aria-labelledby="v-pills-tab-one">
+                        <div>
+                            <nav>
+                                <div class="nav nav-tabs nav-main-tabss border-bottom-0 d-flex justify-content-start align-items-center flex-nowrap font-smallsize" id="nav-tab" role="tablist">
+                                    <a 
+                                        href="{{ url('organization_dashboard') }}" class="nav-link admin-nav-menu {{ Request::is('organization_dashboard') ? 'active' : '' }}" id="od-tab" role="tab" aria-controls="od" aria-selected="{{ Request::is('organization_dashboard') ? 'true' : 'false' }}">
+                                        <i class="fa-solid fa-house me-2 menu-icon1"></i> Dashboard
+                                    </a>
+
+                                    @if(hasPermission(9))
+                                        <a href="{{ url('user_courses') }}" class="nav-link admin-nav-menu {{ Request::is('user_courses') ? 'active' : '' }}" id="mc-tab" role="tab" aria-controls="mc" aria-selected="{{ Request::is('user_courses') ? 'true' : 'false' }}">
+                                            <i class="fa-solid fa-chalkboard-user me-2 menu-icon2"></i> My Online Courses
+                                        </a> 
+                                    @endif
+
+                                    @if(hasPermission(11))
+                                        <a href="{{ url('myinstructorled_courses') }}" class="nav-link admin-nav-menu {{ Request::is('myinstructorled_courses') ? 'active' : '' }}" id="sc-tab"  data-bs-target="#sc" role="tab" aria-controls="sc" aria-selected="{{ Request::is('myinstructorled_courses') ? 'true' : 'false' }}">
+                                            <i class="fa-solid fa-circle-check me-2 menu-icon3"></i> My Instructor-led Courses
+                                        </a>
+                                    @endif
+
+                                    @if(hasPermission(10))
+                                        <a href="{{ url('mycertificates') }}" class="nav-link admin-nav-menu {{ Request::is('mycertificates') ? 'active' : '' }}" id="wd-tab"  data-bs-target="#wd" role="tab" aria-controls="wd" aria-selected="{{ Request::is('mycertificates') ? 'true' : 'false' }}">
+                                            <i class="fa-solid fa-award me-2 menu-icon4"></i> My Certificates
+                                        </a>
+                                    @endif
+
+                                    @if(hasPermission(12))
+                                        <a href="{{ url('myfiles') }}" class="nav-link admin-nav-menu {{ Request::is('myfiles') ? 'active' : '' }}" id="br-tab"  data-bs-target="#br" role="tab" aria-controls="br" aria-selected="{{ Request::is('myfiles') ? 'true' : 'false' }}">
+                                            <i class="fa-solid fa-file me-2 menu-icon5"></i> My Files
+                                        </a>
+                                    @endif
+
+                                    <li class="list-unstyled">
+                                        <a href="{{ url('activity') }}" class="nav-link admin-nav-menu {{ Request::is('activity') ? 'active' : '' }}" role="tab">
+                                            <i class="fas fa-file-edit me-1 menu-icon1"></i> Activity
+                                        </a>
+                                    </li>
+
+                                    {{-- Start "My Roles" dropdown --}}
+                                    {{-- Hidden if acting_role is 'manager2' or 'user' --}}
+                                    @if(session('acting_role') !== 'user')
+                                        <div class="dropdown">
+                                            <a class="btn btn-primaryy-lite dropdown-toggle" href="#" role="button" id="dropdownMenuCourses" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                @if(hasPermission(14) || hasPermission(15) || hasPermission(16) || hasPermission(17))
+                                                    <i class="fa-solid fa-user-gear me-2 menu-icon2"></i>My Roles <i class="fa-solid fa-chevron-down ps-1 fs-7"></i>
+                                                @endif
+                                            </a>
+
+                                            <div class="dropdown-menu drpdwn-menu drpdwnmenu1 px-3 pt-0 mt-1" aria-labelledby="dropdownMenuCourses" style="z-index: 99999;">
+                                                <div class="row">
+                                                    @if(hasPermission(14))
+                                                    <div class="col-12 col-lg-12 pt-4 pb-3">
+                                                        <a href="{{ url('userslist') }}" class="dropdown-item pt-0 {{ Request::is('userslist') ? 'active' : '' }}">
+                                                            <div class="row">
+                                                                <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-user-group mainmenu-icon"></i></div>
+                                                                <div class="col-8 col-md-10 col-lg-10p5">
+                                                                    <div>My Team <i class="fa-solid fa-chevron-right ps-1 fs10"></i></div>
+                                                                    <p class="mb-0">View details about team members and reports.</p>
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                                    @endif
+                                                    {{-- Add your remaining permission blocks (15, 16, 17) here as in your original code --}}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+                                    {{-- End "My Roles" dropdown --}}
+
+                                    {{-- Admin login as --}}
+                                    @if(in_array('1', json_decode(Auth::user()->user_type, true)))
+                                    @php
+                                        $currentActingRole = session('acting_role', 'admin');
+                                    @endphp
+
+
+                                    <div class="dropdown">
+                                        <a class="btn btn-primaryy-lite dropdown-toggle logged-as-switcher" href="#" role="button"
+                                            id="dropdownMenuUsers" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            <i class="fa-solid fa-user-gear me-2 menu-icon3"></i>
+                                            <span class="logged-as-label">Logged As:&nbsp;</span>{{ ucfirst($currentActingRole) }}
+                                            <i class="fa-solid fa-chevron-down ps-1 fs-7"></i>
+                                        </a>
+
+                                        <div class="dropdown-menu drpdwn-menu drpdwnmenu1 px-3 py-2 mt-1"
+                                            aria-labelledby="dropdownMenuUsers" style="z-index: 99999;">
+
+                                            <div class="row">
+
+                                                @if($currentActingRole != 'admin')
+                                                <div class="col-12 col-lg-12 py-2">
+                                                    <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'admin']) }}">
+                                                        <div class="row">
+                                                            <div class="col-4 col-md-2 col-lg-1p5 pr-0">
+                                                                <i class="fa-solid fa-user-shield mainmenu-icon"></i>
+                                                            </div>
+                                                            <div class="col-8 col-md-10 col-lg-10p5">
+                                                                <div>Admin</div>
+                                                                <p class="mb-0">Login as admin.</p>
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                @endif
+
+                                                @if($currentActingRole != 'user')
+                                                <div class="col-12 col-lg-12 py-2">
+                                                    <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'user']) }}">
+                                                        <div class="row">
+                                                            <div class="col-4 col-md-2 col-lg-1p5 pr-0">
+                                                                <i class="fa-solid fa-user-group mainmenu-icon"></i>
+                                                            </div>
+                                                            <div class="col-8 col-md-10 col-lg-10p5">
+                                                                <div>Users</div>
+                                                                <p class="mb-0">Login as user.</p>
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                @endif
+
+                                                @if($currentActingRole != 'teamlead')
+                                                <div class="col-12 col-lg-12 py-2">
+                                                    <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'teamlead']) }}">
+                                                        <div class="row">
+                                                            <div class="col-4 col-md-2 col-lg-1p5 pr-0">
+                                                                <i class="fa-solid fa-users mainmenu-icon"></i>
+                                                            </div>
+                                                            <div class="col-8 col-md-10 col-lg-10p5">
+                                                                <div>Team lead</div>
+                                                                <p class="mb-0">Login as team lead.</p>
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                @endif
+
+                                                @if($currentActingRole != 'manager1')
+                                                <div class="col-12 col-lg-12 py-2">
+                                                    <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'manager1']) }}">
+                                                        <div class="row">
+                                                            <div class="col-4 col-md-2 col-lg-1p5 pr-0">
+                                                                <i class="fa-solid fa-users mainmenu-icon"></i>
+                                                            </div>
+                                                            <div class="col-8 col-md-10 col-lg-10p5">
+                                                                <div>Manager 1</div>
+                                                                <p class="mb-0">Login as manager 1.</p>
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                @endif
+
+                                                @if($currentActingRole != 'manager2')
+                                                <div class="col-12 col-lg-12 py-2">
+                                                    <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'manager2']) }}">
+                                                        <div class="row">
+                                                            <div class="col-4 col-md-2 col-lg-1p5 pr-0">
+                                                                <i class="fa-solid fa-users mainmenu-icon"></i>
+                                                            </div>
+                                                            <div class="col-8 col-md-10 col-lg-10p5">
+                                                                <div>Manager 2</div>
+                                                                <p class="mb-0">Login as manager 2.</p>
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                                @endif
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @endif
+                                    {{-- End admin login as --}}
+                        
+                                </div>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-8 col-md-6 col-lg-2 pe-1 my-auto user-header-profile">
+                <div class="">
+                    <div class="row">
+                        <div class="col-lg-2 px-0 my-auto">
+                            <div class="dropdown" data-bs-auto-close="outside">
+                                <button type="button" class="btn btn-transparent p-0 border-0 web-text-color dropdown-toggle drdwn-not-toggle viewed_notification" data-bs-toggle="dropdown">
+                                    <i class="fa-regular fa-bell bell-styles"></i>
+                                   @if($assigned_course_count > 0) <span class="notification-count ">{{$assigned_course_count??0}}</span> @endif
+                                </button>
+                                <div class="dropdown-menu mt-4 p-2 notification-drpdwn" style="z-index: 999999;">
+                                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                                      <li class="nav-item">
+                                        <button class="nav-link active" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab" aria-controls="notifications" aria-selected="true">Notifications</button>
+                                      </li>
+                                      <li class="nav-item">
+                                        <button class="nav-link" id="Announcements-tab" data-bs-toggle="tab" data-bs-target="#announcements" type="button" role="tab" aria-controls="announcements" aria-selected="false">Announcements</button>
+                                      </li>
+                                    </ul>
+                                    <div class="tab-content border-0" id="myTabContent">
+                                      <div class="tab-pane fade show p-2 active" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+                                        @foreach($assigned_course_message as $msg)
+                                        <div class="dropdown-item px-2 py-2">
+                                            <div class="row">
+                                                <div class="col-2">
+                                                    <img src="{{asset('public/images/face12.jpg')}}" alt="Avatar" class="rounded-circle" width="40" height="40" />
+                                                </div>
+                                                <div class="col-10 pl-0">
+                                                    <div class="header-notification-msgg">
+                                                        <a href="{{$msg->href_url}}" class="">{{$msg->message}}</a>
+                                                    </div>
+                                                    <div>
+                                                        <small class="text-muted mt-2"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($msg->created_at))->diffForHumans() ?></small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @endforeach 
+                                      </div>
+                                      <div class="tab-pane fade p-2" id="announcements" role="tabpanel" aria-labelledby="Announcements-tab">
+                                            <div class="text-center">No Announcements Found</div>
+                                      </div>
+                                    </div>
+                                        
+                                    <div class="text-end mt-2">
+                                        <a href="javascript:void(0);" class="btn web-btn viewed_notification" data-id='0'><small>Clear all</small></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-9 header-profile-details">
+                            <div class="d-flex align-items-center">
+                                <div class="header-profile-img-div">
+                                    @if(!empty(Auth::user()->profile_image))
+                                        <img src="{{ asset('storage/app/public/' . Auth::user()->profile_image) }}" alt="profile" class="rounded-circle" width="40" height="40" >
+                                    @else
+                                        <img src="{{ asset('public/images/face12.jpg') }}" alt="profile" class="rounded-circle" width="40" height="40">
+                                    @endif
+                                </div>
+                                <div class="ps-3 header-profile-text">
+                                    <div class="mb-1 header-profile-name-text">{{Auth::user()->first_name." ".Auth::user()->last_name}}</div>
+                                    <div class="text-muted fs12 text-truncate">{{Auth::user()->designationdetails->designation_name??''}}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-1 px-0 my-auto">
+                            <div class="dropdown text-end">
+                                <button type="button" class="btn btn-transparent p-0 border-0 dropdown-toggle drdwn-prof-toggle" data-bs-toggle="dropdown">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+
+                                <ul class="dropdown-menu drpdwn-menu drpdwnmenu1 px-3 pt-0 pb-0 mt-3" style="z-index: 99999;">
+                                    <div class="row">
+                                        <div class="col-12 col-lg-6 pt-4 pb-3">
+                                            <a class="dropdown-item pt-0" href="{{ url('my_profile') }}">
+                                                <div class="row align-items-center">
+                                                    <div class="col-4 col-md-2 col-lg-3 pr-0">
+                                                        <i class="fa-solid fa-user mainmenu-icon"></i>
+                                                    </div>
+                                                    <div class="col-8 col-md-10 col-lg-9 pl-0">
+                                                        <div>
+                                                            Profile <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                        <div class="col-12 col-lg-6 pt-4 pb-3">
+                                            <a class="dropdown-item pt-0" href="{{url('change-password')}}">
+                                                <div class="row align-items-center">
+                                                    <div class="col-4 col-md-2 col-lg-3 pr-0">
+                                                        <i class="fa-solid fa-lock mainmenu-icon"></i>
+                                                    </div>
+                                                    <div class="col-8 col-md-10 col-lg-9 pl-0">
+                                                        <div>
+                                                            Change Password <i class="fa-solid fa-chevron-right fs10"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                        <div class="col-12 col-lg-6 pt-0 pb-3">
+                                            <a class="dropdown-item pt-0" href="{{url('logout')}}">
+                                                <div class="row align-items-center">
+                                                    <div class="col-4 col-md-2 col-lg-3 pr-0">
+                                                        <i class="fa-solid fa-power-off mainmenu-icon"></i>
+                                                    </div>
+                                                    <div class="col-8 col-md-10 col-lg-9 pl-0">
+                                                        <div>
+                                                            Logout <i class="fa-solid fa-chevron-right fs10"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                        <div class="col-12 col-lg-6 pt-0 pb-3">
+                                             <a class="dropdown-item pt-0" href="{{ url('feedback-ratings') }}">
+                                                <div class="row align-items-center">
+                                                    <div class="col-4 col-md-2 col-lg-3 pr-0">
+                                                      <i class="fa-solid fa-comment-dots me-2 menu-icon1"></i>
+                                                    </div>
+                                                    <div class="col-8 col-md-10 col-lg-9 pl-0">
+                                                        <div>
+                                                              Feedback & Ratings <i class="fa-solid fa-chevron-right fs10"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-block d-lg-none">
+        <div id="myheader-Sidenav" class="header-sidenav">
+            <div class="d-flex justify-content-between align-items-center pl-4 pr-3 pt-3 pb-2">
+                <span class="fw-bold text-blue">MENU</span>
+                <a href="javascript:void(0)" class="closebtn" onclick="closeSideMenu()">&times;</a>
+            </div>
+            <ul class="px-2 w-95p mb-0">
+                <li class="list-unstyled">
+                    <a 
+                        href="{{ url('organization_dashboard') }}" class="nav-link admin-nav-menu {{ Request::is('organization_dashboard') ? 'active' : '' }}" id="od-tab" role="tab" aria-controls="od" aria-selected="{{ Request::is('organization_dashboard') ? 'true' : 'false' }}">
+                        <i class="fa-solid fa-house me-1 me-lg-2 menu-icon1 menu-res-icon"></i> Dashboard
+                    </a>
+                </li>
+                <li class="list-unstyled">
+                    @if(hasPermission(9))
+                        <a href="{{ url('user_courses') }}" class="nav-link admin-nav-menu {{ Request::is('user_courses') ? 'active' : '' }}" id="mc-tab" role="tab" aria-controls="mc" aria-selected="{{ Request::is('user_courses') ? 'true' : 'false' }}">
+                            <i class="fa-solid fa-chalkboard-user me-1 me-lg-2 menu-icon2 menu-res-icon"></i> My Online Courses
+                        </a> 
+                    @endif
+                </li>
+                <li class="list-unstyled">
+                    @if(hasPermission(11))
+                        <a href="{{ url('myinstructorled_courses') }}" class="nav-link admin-nav-menu {{ Request::is('myinstructorled_courses') ? 'active' : '' }}" id="sc-tab"  data-bs-target="#sc" role="tab" aria-controls="sc" aria-selected="{{ Request::is('myinstructorled_courses') ? 'true' : 'false' }}">
+                            <i class="fa-solid fa-circle-check me-1 me-lg-2 menu-icon3 menu-res-icon"></i> My Instructor-led Courses
+                        </a>
+                    @endif
+                </li>
+                <li class="list-unstyled">
+                    @if(hasPermission(10))
+                        <a href="{{ url('mycertificates') }}" class="nav-link admin-nav-menu {{ Request::is('mycertificates') ? 'active' : '' }}" id="wd-tab"  data-bs-target="#wd" role="tab" aria-controls="wd" aria-selected="{{ Request::is('mycertificates') ? 'true' : 'false' }}">
+                            <i class="fa-solid fa-award me-1 me-lg-2 menu-icon4 menu-res-icon"></i> My Certificates
+                        </a>
+                    @endif
+                </li>
+                <li class="list-unstyled">
+                    @if(hasPermission(12))
+                        <a href="{{ url('myfiles') }}" class="nav-link admin-nav-menu {{ Request::is('myfiles') ? 'active' : '' }}" id="br-tab"  data-bs-target="#br" role="tab" aria-controls="br" aria-selected="{{ Request::is('myfiles') ? 'true' : 'false' }}">
+                            <i class="fa-solid fa-file me-1 me-lg-2 menu-icon5 menu-res-icon"></i> My Files
+                        </a>
+                    @endif
+                </li>
+
+                <li class="list-unstyled">
+                    <a href="{{ url('activity') }}" class="nav-link admin-nav-menu {{ Request::is('activity') ? 'active' : '' }}" role="tab">
+                        <i class="fas fa-file-edit me-1 menu-icon1"></i> Activity
+                    </a>
+                </li>
+
+                {{-- Admin login as --}}
+                @if(in_array('1', json_decode(Auth::user()->user_type, true)))
+                <div class="dropdown">
+                    <a class="btn btn-primaryy-lite dropdown-toggle" href="#" role="button" id="dropdownMenuUsersMobile" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa-solid fa-user-gear me-2 menu-icon3"></i>Login as: {{ ucfirst(session('acting_role', 'admin')) }} <i class="fa-solid fa-chevron-down ps-1 fs-7"></i>
+                    </a>
+                    <div class="dropdown-menu drpdwn-menu drpdwnmenu1 px-3 py-2 mt-1" aria-labelledby="dropdownMenuUsersMobile" style="z-index: 99999;">
+                        <div class="row">
+                            @if(session('acting_role', 'admin') !== 'admin')
+                            <div class="col-12 col-lg-12 py-2">
+                                <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'admin']) }}">
+                                    <div class="row">
+                                        <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-user-shield mainmenu-icon"></i></div>
+                                        <div class="col-8 col-md-10 col-lg-10p5"><div>Admin</div><p class="mb-0">Login as admin.</p></div>
+                                    </div>
+                                </a>
+                            </div>
+                            @endif
+                            @if(session('acting_role') !== 'user')
+                            <div class="col-12 col-lg-12 py-2">
+                                <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'user']) }}">
+                                    <div class="row">
+                                        <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-user-group mainmenu-icon"></i></div>
+                                        <div class="col-8 col-md-10 col-lg-10p5"><div>Users</div><p class="mb-0">Login as user.</p></div>
+                                    </div>
+                                </a>
+                            </div>
+                            @endif
+                            @if(session('acting_role') !== 'teamlead')
+                            <div class="col-12 col-lg-12 py-2">
+                                <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'teamlead']) }}">
+                                    <div class="row">
+                                        <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-users mainmenu-icon"></i></div>
+                                        <div class="col-8 col-md-10 col-lg-10p5"><div>Team lead</div><p class="mb-0">Login as team lead.</p></div>
+                                    </div>
+                                </a>
+                            </div>
+                            @endif
+                            @if(session('acting_role') !== 'manager1')
+                            <div class="col-12 col-lg-12 py-2">
+                                <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'manager1']) }}">
+                                    <div class="row">
+                                        <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-users mainmenu-icon"></i></div>
+                                        <div class="col-8 col-md-10 col-lg-10p5"><div>Manager 1</div><p class="mb-0">Login as manager 1.</p></div>
+                                    </div>
+                                </a>
+                            </div>
+                            @endif
+                            @if(session('acting_role') !== 'manager2')
+                            <div class="col-12 col-lg-12 py-2">
+                                <a class="dropdown-item pt-0" href="{{ route('login.as', ['role' => 'manager2']) }}">
+                                    <div class="row">
+                                        <div class="col-4 col-md-2 col-lg-1p5 pr-0"><i class="fa-solid fa-users mainmenu-icon"></i></div>
+                                        <div class="col-8 col-md-10 col-lg-10p5"><div>Manager 2</div><p class="mb-0">Login as manager 2.</p></div>
+                                    </div>
+                                </a>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                @endif
+                {{-- End admin login as --}}
+
+                @if(!session('acting_role') || session('acting_role') === 'admin')
+                <li class="list-unstyled">
+                    <div class="dropdown responsive-sidemanu-dropdown">
+                        <button class="btn responsive-sidemanu-dropdown-btn dropdown-toggle my-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa-solid fa-user-gear me-2 menu-icon2 menu-res-icon"></i>My Roles <i class="fa-solid fa-chevron-down ps-1 fs-7"></i>
+                        </button>
+                        <ul class="dropdown-menu py-1">
+                            <li class=" ">
+                                @if(hasPermission(14))
+                                <div class="col-12 py-2">
+                                    <a href="{{ url('userslist') }}" class="nav-link admin-nav-menu dropdown-item responsive-dropdown-item p-0 {{ Request::is('userslist') ? 'active' : '' }}" id="fi-0-tab"  data-bs-target="#fi-0" role="tab" aria-controls="fi" aria-selected="{{ Request::is('userslist') ? 'true' : 'false' }}">
+                                        <div class="row align-items-center">
+                                            <div class="col-3 pr-0">
+                                                <div>
+                                                    <i class="fa-solid fa-user-group mainmenu-icon"></i>
+                                                </div>
+                                            </div>
+                                            <div class="col-9 pl-0">
+                                                <div>
+                                                    My Team <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                </div>
+                                                <p>View details about team members,Assigned courses, Course progress reports, Assessments, Assignmens and more..</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                                @endif
+                            </li>
+                            <li class="">
+                                 @if(hasPermission(15))
+                                <div class="col-12 py-2">
+                                    <div class="row align-items-center">
+                                        <div class="col-3 pr-0">
+                                            <div>
+                                                <i class="fa-solid fa-list mainmenu-icon"></i>
+                                            </div>
+                                        </div>
+                                        <div class="col-9 pl-0">
+                                            <div>
+                                                <a href="{{ url('trainercourseslist') }}" class="nav-link admin-nav-menu dropdown-item responsive-dropdown-item p-0 {{ Request::is('trainercourseslist') ? 'active' : '' }}" id="fi-0-tab"  data-bs-target="#fi-0" role="tab" aria-controls="fi" aria-selected="{{ Request::is('trainercourseslist') ? 'true' : 'false' }}"> Trainer Dashboard <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                    </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
+                            </li>
+                            <li class="">
+                                 @if(hasPermission(16))
+                                <div class="col-12 py-2">
+                                    <div class="row align-items-center">
+                                        <div class="col-3 pr-0">
+                                            <div>
+                                                <i class="fa-solid fa-list mainmenu-icon"></i>
+                                            </div>
+                                        </div>
+                                        <div class="col-9 pl-0">
+                                            <div>
+                                                <a href="{{ url('trainersalllist') }}" class="nav-link admin-nav-menu dropdown-item dropdown-item responsive-dropdown-item p-0 {{ Request::is('trainersalllist') ? 'active' : '' }}" id="fb-0-tab"  data-bs-target="#fb-0" role="tab" aria-controls="fb" aria-selected="{{ Request::is('trainersalllist') ? 'true' : 'false' }}"> Trainer Manager Dashboard <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                    </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
+                            </li>
+                            <li class="">
+                                @if(hasPermission(17))
+                                <div class="col-12 py-2">
+                                    <div class="row align-items-center">
+                                        <div class="col-3 pr-0">
+                                            <div>
+                                                <i class="fa-solid fa-list mainmenu-icon"></i>
+                                            </div>
+                                        </div>
+                                        <div class="col-9 pl-0">
+                                            <div>
+                                                <a href="{{ url('seniortrainer_trainerslist') }}" class="nav-link admin-nav-menu dropdown-item responsive-dropdown-item p-0 {{ Request::is('seniortrainer_trainerslist') ? 'active' : '' }}" id="fb-0-tab"  data-bs-target="#fb-0" role="tab" aria-controls="fb" aria-selected="{{ Request::is('seniortrainer_trainerslist') ? 'true' : 'false' }}"> Senior Trainer Dashboard <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                @endif
+
+                <li>
+                    <ul class="prf-menu pl-0">
+                        <li class="list-unstyled">
+                            <a href="{{url('change-password')}}" class="nav-link admin-nav-menu">
+                                <i class="fa-solid fa-lock me-1 me-lg-2 menu-icon2 menu-res-icon"></i> Change Password
+                            </a>
+                        </li>
+
+                        <li class="list-unstyled">
+                            <a href="{{url('logout')}}" class="nav-link admin-nav-menu">
+                                <i class="fa-solid fa-power-off me-1 me-lg-2 menu-icon3 menu-res-icon"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div class="row align-items-center mx-0 my-2">
+            <div class="col-2">
+                <div class="">
+                    <span class="SideMenuToggle" onclick="openSideMenu()">&#9776;</span>
+                </div>
+            </div>
+            <div class="col-10 px-0">
+                <div class="d-flex align-items-center justify-content-end">
+                    <div class="overflow-x-hidden">
+                        <h5 class="font-weight-500 mb-0 text-truncate profile-image-styles">Welcome, {{$user->first_name??''}} {{$user->last_name??''}}</h5>
+                    </div>
+                    <button class="btn btn-transparent py-2 px-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasEnd" aria-controls="offcanvasEnd">
+                        <div><img src="{{asset('public/images/face12.jpg')}}" alt="Avatar" class="profile-image-responsive" /></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="offcanvas profile-ofcanvas offcanvas-end" tabindex="-1" id="offcanvasEnd" aria-labelledby="offcanvasEndLabel">
+          <div class="offcanvas-header">
+            <h4 class="offcanvas-title" id="offcanvasEndLabel">Profile</h4>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body pt-0">
+                <div>
+                    <h5 class="user-last-login-styles-responsive ll-datails">
+                        <span class="opacity-75 font-weight-normal">Last Login :</span>
+                        <span class="">
+                            @php
+                                use Carbon\Carbon;
+                                $lastLogin = isset($secondLastLogin->login_time) 
+                                    ? Carbon::parse($secondLastLogin->login_time)->setTimezone('Asia/Kolkata') 
+                                    : null;
+                            @endphp
+
+                            @if($lastLogin)
+                                {{ $lastLogin->format('F j, Y g:i a \I\S\T') }}
+                            @else
+                                No login data
+                            @endif
+                        </span>
+                    </h5>
+                </div>
+                <div class="row py-2">
+                    <div class="col-4 col-md-3 col-lg-3">
+                        <div class="user-profile-icons">
+                            <i class="fa-solid fa-id-card"></i>
+                        </div>
+                    </div>
+                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                        <div class="text-start">
+                            <h5 class="mb-2">{{$user->emp_id??''}}</h5>
+                            <div class="sub-text">Emp Id</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row py-2">
+                    <div class="col-4 col-md-3 col-lg-3">
+                        <div class="user-profile-icons">
+                            <i class="fa-solid fa-user-gear"></i>
+                        </div>
+                    </div>
+                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                        <div class="text-start">
+                            <h5 class="mb-2">{{$user->designationdetails->designation_name??''}}</h5>
+                            <div class="sub-text">Designation</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row py-2">
+                    <div class="col-4 col-md-3 col-lg-3">
+                        <div class="user-profile-icons">
+                            <i class="fa-regular fa-user"></i>
+                        </div>
+                    </div>
+                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                        <div class="text-start">
+                            <h5 class="mb-2">{{ ucfirst(session('acting_role', 'admin')) }}</h5>
+                            <div class="sub-text">Logged in as</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row py-2">
+                    <div class="col-4 col-md-3 col-lg-3">
+                        <div class="user-profile-icons">
+                            <i class="fa-regular fa-building"></i>
+                        </div>
+                    </div>
+                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                        <div class="text-start">
+                            <h5 class="mb-2">{{$user->departmentdetails->department_name??''}}</h5>
+                            <div class="sub-text">Department</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 my-2">
+                        <div class="profile-rewards-styles">
+                            <div class="row justify-content-center">
+                                <div class="col-6 col-md-8 offset-md-0 col-lg-8 offset-lg-2">
+                                    <img src="{{asset('public/images/rewards-icon.png')}}" alt="profile" class="mx-auto d-block">
+                                </div>
+                            </div>
+                            <div class="mb-3 text-center">
+                                <h5 class="text-white">{{$user->point??'0'}} Points</h5>
+                                <div class="text-white opacity-50 fs-7">My Reward Points</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 my-2">
+                        <div class="profile-rewards-styles">
+                            <div class="row justify-content-center">
+                                <div class="col-6 col-md-12 offset-md-0 col-lg-8 offset-lg-2 py-1 py-md-2 my-0 my-md-1">
+                                    <img src="{{asset('public/images/awards-badge.png')}}" alt="profile" class="mx-auto img-fluid d-block">
+                                </div>
+                            </div>
+                            <div class="mb-3 text-center">
+                                <h5 class="text-white">0</h5>
+                                <div class="text-white opacity-50 fs-7">My Awarded Badges</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 page-body content-bg px-0 px-lg-3">
+
+    <script>
+        function openSideMenu() {
+          document.getElementById("myheader-Sidenav").style.width = "85%";
+        }
+
+        function closeSideMenu() {
+          document.getElementById("myheader-Sidenav").style.width = "0";
+        }
+    </script>
+
+    <script type="text/javascript">
+        document.querySelectorAll('.dropdown-menu').forEach(function(dropdown) {
+            dropdown.addEventListener('click', function(event) {
+                event.stopPropagation();
+            });
+        });
+    </script>

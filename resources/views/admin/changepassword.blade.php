@@ -1,0 +1,154 @@
+@include('layouts.admin.header')
+
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">Change Password</div>
+
+                <div class="card-body">
+                    @if (session('error'))
+                        <div class="alert alert-danger">{{ session('error') }}</div>
+                    @endif
+
+                    @if (session('success'))
+                        <div class="alert alert-success">{{ session('success') }}</div>
+                    @endif
+
+                    <form id="changePasswordForm" method="POST" action="{{ route('admin.password.update') }}">
+                        @csrf
+
+                        <div class="form-group row">
+                            <label for="current_password" class="col-md-4 col-form-label text-md-right">Current Password</label>
+
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input id="current_password" type="password" class="form-control @error('current_password') is-invalid @enderror" name="current_password" required>
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">
+                                            <a href="#" id="toggleCurrentPassword">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </span>
+                                    </div>
+                                </div>
+                                @error('current_password')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="password" class="col-md-4 col-form-label text-md-right">New Password</label>
+
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required>
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">
+                                            <a href="#" id="togglePassword">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </span>
+                                    </div>
+                                </div>
+                                @error('password')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="password_confirmation" class="col-md-4 col-form-label text-md-right">Confirm New Password</label>
+
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input id="password_confirmation" type="password" class="form-control @error('password_confirmation') is-invalid @enderror" name="password_confirmation" required>
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">
+                                            <a href="#" id="togglePasswordConfirmation">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </span>
+                                    </div>
+                                </div>
+                                @error('password_confirmation')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                @enderror
+                                <div id="password_confirmation_error" class="invalid-feedback" style="display: none;">
+                                    Passwords do not match.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group row mb-0">
+                            <div class="col-md-6 offset-md-4">
+                                <button type="submit" class="btn btn-primary">
+                                    Change Password
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Function to toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            var input = $('#' + inputId);
+            var type = input.attr('type') === 'password' ? 'text' : 'password';
+            input.attr('type', type);
+        }
+
+        $('#toggleCurrentPassword').click(function(e) {
+            e.preventDefault();
+            togglePasswordVisibility('current_password');
+        });
+
+        $('#togglePassword').click(function(e) {
+            e.preventDefault();
+            togglePasswordVisibility('password');
+        });
+
+        $('#togglePasswordConfirmation').click(function(e) {
+            e.preventDefault();
+            togglePasswordVisibility('password_confirmation');
+
+            var password = $('#password').val();
+            var passwordConfirmation = $('#password_confirmation').val();
+            var passwordConfirmationError = $('#password_confirmation_error');
+
+            if (password !== passwordConfirmation) {
+                passwordConfirmationError.css('display', 'block');
+            } else {
+                passwordConfirmationError.css('display', 'none');
+            }
+        });
+
+        $('#changePasswordForm').submit(function(e) {
+            var password = $('#password').val();
+            var passwordConfirmation = $('#password_confirmation').val();
+            var passwordConfirmationError = $('#password_confirmation_error');
+
+            if (password !== passwordConfirmation) {
+                passwordConfirmationError.css('display', 'block');
+                e.preventDefault(); // Prevent form submission
+            }
+        });
+    });
+</script>
+
+
+@include('layouts.admin.footer')

@@ -1,0 +1,87 @@
+ <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+		<div class="readability"><center>
+<script>
+// tl_sco_data = $.parseJSON("{\"student_name\":\"Asad,Ataullah\",\"student_id\":\"5\",\"suspend_data\":\"2_1860708090ts1001312k01012011120121201312~2118000000001^1^1^1^1^1^1^1^1^1^v_player.5uEPLWkk0KG.6qklKr1OSXC1^1^000a00000000002000\",\"total_time\":\"0000:04:36.00\",\"lesson_location\":\"\",\"lesson_status\":\"incomplete\",\"datafromlms\":\"\",\"score_raw\":\"\",\"commit_url\":\"https:\\\/\\\/digilms.cloudifinity.in\\\/unit\\\/complete\\\/id:2523\",\"entry\":\"resume\"}");
+
+tl_sco_data =$.parseJSON("{\"student_name\":\"Asad,Ataullah\",\"student_id\":\"5\",\"suspend_data\":\"2x2a60708090a0yx1001412p0101201112012120131201412~2t1a00000000001^1^1^1^1^1^1^1^1^1^10101^1^1^1^101^1^101^1^10v_player.5uEPLWkk0KG.6jHYfdrdsLY1^1^000a00000000002000\",\"total_time\":\"0000:01:32.00\",\"lesson_location\":\"\",\"lesson_status\":\"incomplete\",\"datafromlms\":\"\",\"score_raw\":\"\",\"commit_url\":\"https:\\\/\\\/tas.talentlms.com\\\/unit\\\/complete\\\/id:2524\",\"entry\":\"ab-initio\"}");
+</script>
+ <script src="talentlms.js"></script>
+<center>
+	<iframe id='scorm-frame' class='tl-scorm-frame' name='scorm-frame' width='980' height='660' data-launch-point='digilms.cloudifinity.in/storage/app/public/scrom_videos/11/index_lms.html' src='https://digilms.cloudifinity.in/talentscorm.html' allowfullscreen=
+'allowfullscreen' mozallowfullscreen='mozallowfullscreen' msallowfullscreen='msallowfullscreen' oallowfullscreen='oallowfullscreen' webkitallowfullscreen=
+'webkitallowfullscreen'></iframe>
+</center>
+
+<script>
+window.onload = function () {
+	tl_sco_data.scorm = {
+		'frame_border': false,
+		'height': 600,
+		'src': $('#scorm-frame').data('launch-point'),
+		'width': '100%',
+		'launch_url': window.location.href
+	};
+
+    $('#scorm-frame').ready(function () { 
+        document.getElementById('scorm-frame').contentWindow.postMessage(tl_sco_data, '*');
+    });
+
+	// Acquire scorm state data:
+	function receiveMessage(e) {
+	/**
+	 * Important Note
+	 *
+	 * Check "e.origin" to make sure that this message came from  the correct domain,
+	 * for example "talentlms.com".
+	 */
+
+	// if(e.data.launchURL != window.location.href){
+	// 			return;
+	// }
+
+		
+		if('fetch' in window){ 
+			var opts = {
+				keepalive: true,
+				method: "POST",
+				body: $.param(e.data.sendValues),
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+				}
+			};
+
+			fetch(tl_sco_data.commit_url, opts)
+				.then(function(response) {
+					return response.text();
+				})
+				 .then(function(json){
+					updateProgress(json);
+					updateSCORMProgress(json);
+				})
+				 .catch(function(err){
+					console.log('Commit-Fetch error', err);
+				});
+		}
+		else{ 
+			$.ajax(
+				tl_sco_data.commit_url, {
+					async: false,
+					type: "post",
+					data: $.param(e.data.sendValues),
+					success: function(response){
+						updateProgress(response);
+						updateSCORMProgress(response);
+					}
+				});
+		}
+			}
+
+	window.addEventListener('message', receiveMessage);
+};
+
+
+
+function updateSCORMProgress(response) {
+
+}
+</script></center></div>

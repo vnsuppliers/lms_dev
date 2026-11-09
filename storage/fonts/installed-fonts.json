@@ -1,0 +1,24 @@
+{
+    "allura": {
+        "normal": "allura_normal_02baa9c98be68ba2e5ab5b060c23efa3"
+    },
+    "eb garamond": {
+        "italic": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_italic_61a04f268a22270a8cb4531cb16fe371",
+        "500_italic": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_500_italic_ab18c9bf5e467c440ba58336c699cc2d",
+        "600_italic": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_600_italic_5b0003274586633ac452ff184435f1db",
+        "bold_italic": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_bold_italic_915afbca0b34c69890046f08da3d0359",
+        "800_italic": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_800_italic_102844af5d630c3937fc6ac6e5e71663",
+        "normal": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_normal_7e89c4f75658e138e227988d8d87b580",
+        "500": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_500_57093500b00d48de4ed2302582be5224",
+        "600": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_600_1d2b70c25605e7ad5274b899176aba2a",
+        "bold": "D:\\xampp\\htdocs\\lms_dev\\storage\\fonts\/eb_garamond_bold_cb60117118bb3b7b5dab45a6639851c9",
+        "800": "eb_garamond_800_c62915787c7b2a98127c45a5ad59dc5b"
+    },
+    "rubik": {
+        "300": "C:\\xampp\\htdocs\\lms\\lms_dev\\storage\\fonts\/rubik_300_52b84309e4e80f3d297e652c1a0e6329",
+        "bold": "C:\\xampp\\htdocs\\lms\\lms_dev\\storage\\fonts\/rubik_bold_6992f37767f6a42d617aa357f454f57b",
+        "500": "C:\\xampp\\htdocs\\lms\\lms_dev\\storage\\fonts\/rubik_500_742b632661a5ff7717c84db0fe5df586",
+        "normal": "C:\\xampp\\htdocs\\lms\\lms_dev\\storage\\fonts\/rubik_normal_ca2a3941da1c91b382f0af57ec20968d",
+        "900": "rubik_900_c908cdf7b73885276bb60386a8703b85"
+    }
+}

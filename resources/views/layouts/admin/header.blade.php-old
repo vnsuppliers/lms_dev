@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+@php $site = \App\Models\Site::select('site_name', 'banner_image', 'favicon', 'hide_sitename') ->orderBy('updated_at', 'desc')->first(); @endphp @if($site && $site->favicon)
+<link rel="shortcut icon" href="{{ asset('storage/app/public/'.$site->favicon) }}" type="image/x-icon"> @endif
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>{{ $site->site_name }}</title>
+
+    @if ($site && $site->banner_image)
+    <link rel="shortcut icon" href="{{ asset('storage/'.$site->banner_image) }}" type="image/x-icon"> @endif
+    <!-- plugins:css -->
+
+    <link rel="stylesheet" href="{{asset('public/vendors/css/vendor.bundle.base.css')}}">
+    <link rel="stylesheet" href="{{asset('public/vendors/css/vendor.bundle.addons.css')}}">
+    <link rel="stylesheet" href="{{asset('public/vendors/css/bootstrap.min.css')}}">
+    <link href="{{asset('public/vendors/css/bootstrap-icons.css')}}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Allura&family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <!-- endinject -->
+    <!-- plugin css for this page -->
+    <!-- End plugin css for this page -->
+    <!-- inject:css -->
+    <link rel="stylesheet" href="{{asset('public/css/horizontal-layout/style.css')}}">
+    <link rel="stylesheet" href="{{asset('public/css/horizontal-layout/lms.css')}}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.css">
+    <link rel="stylesheet" href="{{ asset('public/css/jquery.toast.css')}}">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.3/themes/base/jquery-ui.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.0/jquery.validate.min.js"></script>
+    <script src="{{asset('public/js/jquery.toast.js')}}"></script>
+
+    <!-- endinject -->
+    <link rel="shortcut icon" href="" />
+    <style type="text/css">
+        .theme-loader {
+        height: 100%;
+        width: 100%;
+        background-color: #fff;
+        position: fixed;
+        z-index: 999999;
+    }
+    
+    @-webkit-keyframes ball-scale {
+        0% {
+            -webkit-transform: scale(0);
+            transform: scale(0);
+        }
+        100% {
+            -webkit-transform: scale(1);
+            transform: scale(1);
+            opacity: 0;
+        }
+    }
+    @keyframes ball-scale {
+        0% {
+            -webkit-transform: scale(0);
+            transform: scale(0);
+        }
+        100% {
+            -webkit-transform: scale(1);
+            transform: scale(1);
+            opacity: 0;
+        }
+    }
+    .ball-scale {
+        left: 0;
+        margin: 0 auto;
+        position: absolute;
+        right: 0;
+        text-align: center;
+        top: 45%;
+        width: 100%;
+    }
+    
+    .ball-scale > div {
+        -webkit-animation: ball-scale 1s 0s ease-in-out infinite;
+        animation: ball-scale 1s 0s ease-in-out infinite;
+        background-color: #148f77;
+        border-radius: 100px;
+        display: inline-block;
+        height: 60px;
+        width: 60px;
+    }
+    .header-stickky{ 
+        z-index: 9999999999; 
+        position: relative; 
+        top: -55px; 
+    }
+     </style>
+
+</head>
+
+<body>
+    <div class="theme-loader">
+        <div class="ball-scale">
+            <div>
+
+            </div>
+        </div>
+    </div>
+<!-- header starts -->
+    <div class="horizontal-menu">
+        <nav class="top-navbar align-items-start p-0 page-header-two">
+            <div class="contain mx-4">
+                <div class="row">
+
+                    <div class="col-lg-4 d-flex align-items-center justify-content-between w-100 my-lg-auto">
+
+                        <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-center">
+                            @if($site && isset($site->banner_image))
+                            <img src="{{ asset('storage/app/public/'.$site->banner_image) }}" width="40" height="40" /> @endif @if($site->hide_sitename==0)
+                            <a class="navbar-brand brand-logo text-white ps-3" href="{{ url('organizationdashboard') }}">
+                                <div id="headerSiteName">{{ $site->site_name ?? '' }}</div>
+                            </a>
+                            @endif
+                        </div>
+
+                    </div>
+                    @if ($errors->any())
+                    <div class="row">
+                        @foreach ($errors->all() as $error)
+                        <div class="col-12 my-3">
+                            <p class="alert alert-danger">{!! $error !!}</p>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+
+
+
+
+
+                    <div class="col-lg-4"></div>
+
+                    <div class="col-lg-4 d-flex align-items-center justify-content-end w-100 my-lg-2">
+                        <form class="forms-sample">
+                            <div class="form-group d-flex align-items-center">
+                                <!--<label class="col-form-label text-white mb-0 px-2">View As</label>-->
+                                <div class="">
+                                    <!-- <select class="js-example-basic-single form-select-control"
+                                        style="height: 35px;">
+                                        <option value="AL">Administrator</option>
+                                        <option value="WY">Learner</option>
+                                        <option value="WY">Instructor</option>
+                                    </select>  -->
+                                </div>
+
+                            </div>
+                        </form>
+                        <div class="d-flex align-items-center mr-3">
+                            <!-- <div class="mr-2">
+                                <img src="{{asset('public/images/face12.jpg')}}" alt="profile"
+                                    class="rounded-circle" width="50" height="50" />
+                            </div> -->
+                            <div>
+                                <div class="text-white mb-1">{{Auth::user()->first_name." ".Auth::user()->last_name}}</div>
+                                <div class="text-white small-font">Admin</div>
+                            </div>
+                        </div>
+                        <div class="">
+                            <div class="dropdown">
+                                <button type="button" class="btn btn-transparent p-0 border-0 text-white dropdown-toggle drdwn-prof-toggle" data-bs-toggle="dropdown">
+                                    <img src="{{asset('public/images/face12.jpg')}}" alt="profile" class="rounded-circle" width="40" height="40" />
+                                </button>
+
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item profile-items" href="{{url('admin-profile')}}">My Profile</a></li>
+                                    <li><a class="dropdown-item profile-items" href="{{url('change_password')}}">Change Password</a></li>
+                                    <li>
+                                        <a class="dropdown-item profile-items" href="{{url('logout')}}">
+                                            <!-- <i class="fa-solid fa-power-off"></i>  -->
+                                            Logout
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                </div>
+            </div>
+        </nav>
+    </div>
+
+<!-- header end -->
+
+    <div class="">
+        <!-- partial:../../partials/_horizontal-navbar.html -->
+        
+        <div class="container-fluid page-body-wrapper header-stickky">
+            <div class="main-panel">
+                <div class="content-wrappe m-2 m-md-3 m-lg-3">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card shadow-none mb-3">
+                                <div class="card-body pt-0 pb-0 px-2 mx-0 mb-3">
+
+
+                                    <div class="row">
+                                        <div class="col-12 p-2">
+                                            <div class="tab-content border-0" id="v-pills-tabContent">
+                                                <div class="tab-pane fade show active" id="v-pills1" role="tabpanel" aria-labelledby="v-pills-tab-one">
+                                                    <div>
+                                                        <nav>
+
+
+                                                            <div class="nav nav-tabs nav-main-tabss font-smallsize" id="nav-tab" role="tablist">
+                                                                <a href="{{url('organizationdashboard')}}" class="nav-link admin-nav-menu {{ Request::is('organizationdashboard') ? 'active' : '' }}" id="dab-tab" role="tab" aria-controls="dab" aria-selected="true">Organization Dashboard</a>
+                                                               
+                                                                <div class="dropdown">
+                                                                    <a class="btn btn-primaryy-lite dropdown-toggle {{ Request::is('coursecatalog') ? 'active' : '' }}" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Course Catalog        </a>
+
+                                                                    <div class="dropdown-menu drpdwn-menu" aria-labelledby="dropdownMenuLink" style="z-index: 999;">
+                                                                        <a class="dropdown-item" href="{{url('coursecatalog?tab=2')}}">Courses</a>
+                                                                        <a class="dropdown-item" href="{{url('coursecatalog?tab=4')}}">Categories</a>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="dropdown">
+                                                                    <a class="btn btn-primaryy-lite dropdown-toggle {{ Request::is('users') ? 'active' : '' }}" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> User Management        </a>
+
+                                                                    <div class="dropdown-menu drpdwn-menu" aria-labelledby="dropdownMenuLink" style="z-index: 999;">
+                                                                        <a class="dropdown-item" href="{{url('users?tab=2')}}">Users</a>
+                                                                        <a class="dropdown-item" href="{{url('users?tab=4')}}">Groups</a>
+                                                                    </div>
+                                                                </div>
+                                                                <!-- <a href="{{url('users?tab=2')}}" class="nav-link admin-nav-menu" id="ui-tab"  role="tab" aria-controls="ui" aria-selected="false">User Management</a> -->
+                                                                <a href="{{url('reports')}}" class="nav-link admin-nav-menu {{ Request::is('reports') ? 'active' : '' }}" id="fm-tab" role="tab" aria-controls="fm" aria-selected="false">Reports</a>
+                                                                <!-- <a href="{{url('usertypes')}}" class="nav-link admin-nav-menu" id="ut-tab"  role="tab" aria-controls="ut" aria-selected="false">User Types</a> -->
+                                                                <a href="{{url('importexport')}}" class="nav-link admin-nav-menu {{ Request::is('importexport') ? 'active' : '' }}" id="fi-tab" role="tab" aria-controls="fi" aria-selected="false">Import & Export</a>
+                                                                <a href="{{url('automation')}}" class="nav-link admin-nav-menu {{ Request::is('automation') ? 'active' : '' }}" id="au-tab" role="tab" aria-controls="au" aria-selected="false">Automation</a>
+                                                                <a href="{{url('settings')}}" class="nav-link admin-nav-menu {{ Request::is('settings') ? 'active' : '' }}" id="st-tab" role="tab" aria-controls="st" aria-selected="false">Settings</a>
+                                                                <a href="{{url('mail_templates')}}" class="nav-link admin-nav-menu {{ Request::is('mail_templates') ? 'active' : '' }}" id="nav-profile-tab" role="tab" aria-controls="nav-profile" aria-selected="false">Email Templates</a>
+                                                                
+                                                                <a href="{{url('roles')}}" class="nav-link admin-nav-menu {{ Request::is('roles') ? 'active' : '' }}" id="role-tab" role="tab" aria-controls="roless" aria-selected="false">Roles & Permissions</a>
+                                                                <a href="https://assessment.digicat.ai/" target="blank" class="nav-link admin-nav-menu" id="role-tab" role="tab" aria-controls="roless" aria-selected="false">Assesment</a>
+
+                                                                <a href="{{url('masters')}}" class="nav-link admin-nav-menu {{ Request::is('masters') ? 'active' : '' }}" id="role-tab" role="tab" aria-controls="roless" aria-selected="false">Masters</a>
+
+                                                            </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- <script>
+                                        $(document).ready(function(){
+                                            // Add background color
+                                            $(".header-stickky").css("z-index", "0");
+                                        });
+                                        $(document).ready(function(){
+                                            // Remove background color
+                                            $(".header-stickky").css("z-index", "9999");
+                                        });
+                                    </script> -->
+                                    <!-- <script>
+                                        $(document).ready(function(){
+                                            $(window).scroll(function() {
+                                                if ($(this).scrollTop() > 100) { // adjust this value as needed
+                                                    $(".header-stickky").css("z-index", "1000");
+                                                    $(".page-header-two").css("height", "62px");
+                                                } else {
+                                                    $(".header-stickky").css("z-index", "");
+                                                    $(".page-header-two").css("height", "110px")
+                                                }
+                                            });
+                                        });
+                                    </script> -->

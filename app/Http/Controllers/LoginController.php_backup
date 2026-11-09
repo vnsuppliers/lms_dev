@@ -1,0 +1,174 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\User_login;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
+use App\Helpers\ActivityLog;
+use App\Helpers\Activity;
+
+class LoginController extends Controller
+{
+    public function showLoginForm()
+    {
+        //dd('hi test');
+        if (Auth::check()) {
+            $user = Auth::user();
+            $userTypes = json_decode($user->user_type, true);
+
+            // Check if user type includes 1
+            if (in_array(1, $userTypes)) {
+                return redirect()->intended('organizationdashboard');
+            } else {
+                return redirect('organization_dashboard');
+            }
+        }
+   // dd('commm');
+        return view('auth.login');
+    }
+
+    public function authenticate(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $credentials = $request->only('email', 'password');
+
+        if (Auth::attempt($credentials)) {
+            $user = Auth::user();
+            $user->last_login = now(); // Update last login timestamp
+            $user->save();
+
+            $userTypes = json_decode($user->user_type, true);
+
+            // Check if user type includes 1
+            if (in_array(1, $userTypes) || $user->roles->contains('role_type', 1)) {
+                return redirect()->intended('organizationdashboard');
+            } else {
+                User_login::create(['user_id' => $user->id, 'login_time' => now()]);
+                return redirect('organization_dashboard');
+            }
+        } else {
+            return redirect('/')->with('error', 'Invalid credentials');
+        }
+    }
+
+    public function logout()
+    {
+        // Retrieve the latest login record for the authenticated user
+        $latestLogin = User_login::where('user_id', auth()->user()->id)
+                                ->orderBy('id', 'desc') // Order by ID to get the most recent record
+                                ->first(); // Get the first result, which will be the latest login
+
+        // Check if a login record exists
+        if ($latestLogin) {
+            // Calculate the time difference in minutes between the login time and now
+            $loginTime = $latestLogin->created_at;
+            $logoutTime = now(); // Current time when the user is logging out
+
+            // Calculate the full interval
+            $duration = \Carbon\Carbon::parse($loginTime)->diffAsCarbonInterval($logoutTime);
+            $durationString = $duration->format('%i minutes %s seconds');
+
+            // Log the activity with the formatted string
+            ActivityLog::log(
+                auth()->user(),
+                'Logged in for ' . $durationString . ' before logging out.',
+                2
+            );
+
+            // Update the record
+            $latestLogin->update([
+                'logout_at' => $logoutTime,
+                'session_duration' => $durationString,
+            ]);
+        }
+
+        // Clear the session
+        Session::flush();
+
+        // Logout the user
+        Auth::logout();
+
+        // Redirect to home
+        return redirect('/');
+    }
+
+
+    public function forgetPassword(Request $request)
+    {
+        return view('auth.passwords.email');
+    }
+
+    public function loginAs($role)
+    {
+        $roleMap = [
+            'admin'    => '1',
+            'user'     => '2',
+            'manager1' => '3',
+            'manager2' => '4',
+            'teamlead' => '5',
+        ];
+
+        if (!array_key_exists($role, $roleMap)) {
+            abort(404);
+        }
+
+        $user = Auth::user();
+
+        // Log current session duration before switching
+        $latestLogin = User_login::where('user_id', auth()->user()->id)
+                                ->orderBy('id', 'desc')
+                                ->first();
+
+        if ($latestLogin) {
+            $loginTime = $latestLogin->created_at;
+            $logoutTime = now();
+
+                $duration = \Carbon\Carbon::parse($loginTime)->diffAsCarbonInterval($logoutTime);
+
+                // Format: "X minutes Y seconds"
+                $durationString = $duration->format('%i minutes %s seconds');
+
+                ActivityLog::log(
+                    auth()->user(),
+                    'Logged in for ' . $durationString . ' before logging out.',
+                    2
+                );
+
+                $latestLogin->update([
+                    'logout_at'        => $logoutTime,
+                    'session_duration' => $durationString, // Stores the string in DB
+                ]);
+        }
+
+        Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+
+        // Login same user back
+        Auth::loginUsingId($user->id);
+        request()->session()->regenerate();
+
+        // Create new login record for the new role session
+        User_login::create([
+            'user_id'    => $user->id,
+            'login_time' => now(),
+        ]);
+
+        // Store acting role in session
+        session(['acting_role' => $role]);
+
+        if ($role === 'admin') {
+            return redirect('organizationdashboard');
+        }
+
+        return redirect('organization_dashboard');
+    }
+
+}

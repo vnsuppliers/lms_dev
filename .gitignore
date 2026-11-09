@@ -1,0 +1,43 @@
+# Laravel environment files
+.env
+.env.*
+!.env.example
+.env_local
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Laravel cache and logs
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/bootstrap/cache/*.php
+
+# Application keys
+/storage/*.key
+
+# Local files
+.phpunit.result.cache
+error_log
+logs/
+scratch/
+screen_recording.mp4
+test_output.txt
+
+# Local PHP configuration
+php.ini
+info.php
+
+# Temporary Apache files
+.htaccess.lock-*
+.htaccess.phpupgrader.*
+.htaccess_working_copy
+
+# IDE
+.idea/
+.vscode/
+
+# Recursive or duplicate public folder / junction
+/public/public/

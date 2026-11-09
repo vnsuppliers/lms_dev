@@ -1,0 +1,9 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14">
+	<title>icons8-sort-down-14</title>
+	<defs>
+		<image  width="10" height="10" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAMAAAC67D+PAAAAAXNSR0IB2cksfwAAADxQTFRFAAAADVCGD1CHD0+HEFKJEFKIEFKJEFKJAAD/EVKJEVCIEFGIEFGIEVGKDlKID1KJD1KJDlOKD1GIFVV//WieSgAAABR0Uk5TACYzIP/+ycwBSknIy0hHw8dGwgxDKuADAAAAT0lEQVR4nC3LSwqAMBAD0AwDxV/twvsf0Q+CVVFa06lZhAchAhGU5CxaBUkCl4zKtX2MLnLub6p5L9KfZLejnMKBYYNxjPBrJYIu+DlhZn+u5BEWkKNwpQAAAABJRU5ErkJggg=="/>
+	</defs>
+	<style>
+	</style>
+	<use id="Background" href="#img1" x="2" y="2"/>
+</svg>

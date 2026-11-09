@@ -1,0 +1,1713 @@
+@include('layouts.admin.header')
+
+<style>
+    .table > thead > tr > th {
+        font-weight: 500;
+        font-size: 16px;
+        color: #28313c !important;
+        font-weight: 600 !important;
+    }
+    .content-bg{
+        background: #f4f7fa;
+    }
+    body, html {
+     overflow-x: hidden !important;
+    }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/bs-brain@2.0.4/components/charts/chart-2/assets/css/chart-2.css">
+
+
+    <div class="tab-content content-bg rounded-3 border-0 pt-0 pb-2 p-0" id="navtabContent" style="border-top: 1px solid #eeeef0;">
+        <div class="tab-pane fade show active" id="dab" role="tabpanel" aria-labelledby="dab-tab">
+            <div class="row px-0 px-md-2 px-lg-2">
+
+                <div class="col-12 col-lg-3 pt-3 border-right-4-sep-dsbd d-none d-lg-block">
+                    <div class="row justify-content-center px-3">
+                        <div class="col-12 col-lg-12 px-2 px-lg-0">
+                            <div class="cardd bg-white p-4">
+                                <div class="user-main-profile-image-div bg-transparent">
+                                    @if(!empty(Auth::user()->profile_image))
+                                        <img src="{{ asset('storage/app/public/' . Auth::user()->profile_image) }}" alt="profile" class="rounded-circle mx-auto d-block">
+                                    @else
+                                        <img src="{{ asset('public/images/face12.jpg') }}" alt="profile" class="rounded-circle mx-auto d-block">
+                                    @endif
+                                </div>
+                                 <!-- <button class="edit-button position-absolute" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                                    <i class="fa fa-pencil"></i> 
+                                </button> -->
+                                <div class="admin-detils text-center">
+                                    <span>Welcome</span>
+                                    <span class="font-weight-bold">{{Auth::user()->first_name??''}} {{Auth::user()->last_name??''}}</span>
+                                </div>
+                                <div class="mt-2">
+                                    <a href="{{url('admin-profile')}}" class="web-text-color font-weight-bold d-flex align-items-center justify-content-center text-decoration-underline"> 
+                                        <small class="ps-2">Manage Profile</small>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- <div class="row">
+                        <div class="col-12 my-2">
+                            <div class="admin-profile-img mb-3">
+                                @if(!empty(Auth::user()->profile_image))
+                                    <img src="{{ asset('storage/app/public/' . Auth::user()->profile_image) }}" alt="profile" class="rounded-circle mx-auto d-block">
+                                @else
+                                    <img src="{{ asset('public/images/face12.jpg') }}" alt="profile" class="rounded-circle mx-auto d-block">
+                                @endif
+                            </div>
+                            
+                             <div class="admin-detils">
+                                <span>Role:</span>
+                                <span class="font-weight-bold">Administrator</span>
+                            </div>
+                            <div class="admin-detils">
+                                <span>Last Login:</span>
+                                <span class="font-weight-bold"></span>
+                            </div>                             <div class="admin-detils">
+                                <a href="{{url('admin-profile')}}">View Profile</a>
+                            </div>
+                        </div>
+                    </div> -->
+                    
+                    <div class="row px-3 mt-3">
+                        <div class="col-12 px-2 px-lg-0">
+                            <div class="cardd bg-white py-2">
+                                <div class="row py-2">
+                                    <div class="col-4 col-md-3 col-lg-3">
+                                        <div class="user-profile-icons">
+                                            <i class="fa-solid fa-id-card"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                                        <div class="text-start">
+
+                                            <div class="sub-text mb-2">Emp Id</div>
+                                            <h5 class="mb-0">TAS 110</h5>
+
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4 col-md-3 col-lg-3">
+                                        <div class="user-profile-icons">
+                                            <i class="fa-solid fa-user-gear"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                                        <div class="text-start">
+                                            <div class="sub-text mb-2">Designation</div>
+                                            <h5 class="mb-0">Lead Engineer</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4 col-md-3 col-lg-3">
+                                        <div class="user-profile-icons">
+                                            <i class="fa-regular fa-user"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                                        <div class="text-start">
+                                            <div class="sub-text mb-2">Role</div>
+                                            <h5 class="mb-0">Administrator</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row py-2">
+                                    <div class="col-4 col-md-3 col-lg-3">
+                                        <div class="user-profile-icons">
+                                            <i class="fa-regular fa-building"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-8 col-md-9 col-lg-9 my-auto ps-0">
+                                        <div class="text-start">
+                                            <div class="sub-text mb-2">Department</div>
+                                            <h5 class="mb-0">KMS CURRIES</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="admin-detils text-center mb-2 pt-1">
+                                            <a class="sub-text text-decoration-underline text-blue" href="{{url('logout')}}">Logout</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-9 pt-2">
+                    <div class="row px-2">
+                        <div class="col-12 col-md-6 col-lg-4 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-5 my-lg-auto">
+                                        <div class="font-weight-bold">Total Courses</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-7 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="category_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- <div class="col-6">
+                                        <div class="dropdown text-end">
+                                            <button class="btn btn-secondary dropdown-toggle p-1 db-filter-drpdwn-wo-toggle bg-transparent border" type="button" id="courses-filter-MenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                <i class="bi bi-filter"></i>
+                                            </button>
+                                            <div class="dropdown-menu" aria-labelledby="courses-filter-MenuButton">
+                                                <a class="dropdown-item">
+                                                    <div>
+                                                        <select id="category_id" class="dasboard-filters-drpdwn filters">
+                                                            <option value="">All Catergories</option>
+                                                            @foreach($category_list as $cat)
+                                                            <option value="{{$cat->id}}" @if($request->category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                </a>
+                                            </div>
+                                        </div>  
+                                    </div> -->
+                                </div>
+                                <div class="row my-2 my-lg-2">
+                                    <div class="col-6 my-auto">
+                                        <div class="">
+                                            <h2 class="mb-0">{{$courses_count??'0'}}</h2>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 my-auto">
+                                        <div>
+                                            <div id="coursePieChart" style="width: 100%; height: auto;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+        <div class="text-center">
+            <div class="status-text">Active</div>
+            <div class="pt-1 d-flex align-items-center justify-content-center">
+                <span class="cardd-chat-circle bg-primary"></span>
+                <span class="font-weight-bold">
+                    <a href="{{ url('coursecatalog?status=1&course_created_date=&from_date=&to_date=&course_name_sort=&created_at_sort=') }}">
+                        {{ $active_courses_count ?? '0' }}
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+
+
+                                   <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Inactive</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-success"></span>
+                                                <span class="font-weight-bold">
+                                                    <a href="{{ url('coursecatalog?status=0&course_created_date=&from_date=&to_date=&course_name_sort=&created_at_sort=') }}">
+                           {{$inactive_courses_count??'0'}}
+                        </a>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                     <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Assigned</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-warning"></span>
+                                                <span class="font-weight-bold">
+                                                <a href="{{ url('coursecatalog?status=&course_created_date=&from_date=&to_date=&course_name_sort=&created_at_sort=&course_status=1') }}">{{$assigned_courses_count??'0'}}
+                                                </a>
+                                            </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                   <!-- <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Completed</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-success"></span>
+                                                <span class="font-weight-bold">{{$completed_course_count??'0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                    <!-- <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">In-progress</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-info"></span>
+                                                <span class="font-weight-bold">{{$inprogress_courses_count??'0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Pending</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-danger"></span>
+                                                <span class="font-weight-bold">{{$pending_course_count??'0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-5 my-lg-auto">
+                                        <div class="font-weight-bold">Total Users</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-7 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="department_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Departments</option>
+                                                @foreach($department_list as $dep)
+                                                <option value="{{$dep->id}}" @if($request->department_id==$dep->id) Selected @endif>{{$dep->department_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+          
+                                <div class="row my-2 my-lg-2">
+                                    <div class="col-6 my-auto">
+                                        <div class="">
+                                            <h2 class="mb-0">{{$user_count??'0'}}</h2>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 my-auto">
+                                        <div>
+                                            <div id="userPieChart" style="width: 100%; height: auto;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Active</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-primary"></span>
+                                                <span class="font-weight-bold">
+                                                    <a href="{{ url('users?tab=2&user_active=1') }}">{{$user_active_count??'0'}}
+                                                    </a>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Enrolled</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-warning"></span>
+                                                <span class="font-weight-bold">
+                                                    <a href="{{ url('users?tab=2&user_active=2') }}">
+                                                {{$user_enrolled_count??'0'}}
+                                            </a>
+                                            </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">In-progress</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-success"></span>
+                                                <span class="font-weight-bold">28</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 col-md-4 col-lg-20 px-2 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Expired</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-info"></span>
+                                                <span class="font-weight-bold">7</span>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-5 my-lg-auto">
+                                        <div class="font-weight-bold">Assessments</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-7 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="assesment_category" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->assesment_category==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                                <div class="row my-2 my-lg-2">
+                                    <div class="col-6 my-auto">
+                                        <div class="">
+                                            <h2 class="mb-0">{{$chartData['total_count'] ?? '0'}}</h2>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 my-auto">
+                                        <div>
+                                            <div id="assesmentPieChart" style="width: 100%; height: auto;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-4 col-lg-20 px-2 py-1 py-md-0 px-lg-1 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">Active</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-primary"></span>
+                                                <span class="font-weight-bold">{{$chartData['total_active'] ?? '0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 col-lg-20 px-2 py-1 py-md-0 px-lg-1 my-1">
+                                        <div class="text-center">
+                                            <div class="status-text">In Active</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-warning"></span>
+                                                <span class="font-weight-bold">{{$chartData['in_active'] ?? '0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+<!--                                     <div class="col-12 col-lg-20 px-2 px-lg-1 my-1">
+
+                                        <div class="text-center">
+                                            <div class="status-text">1<sup>st</sup> Attempt</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-success"></span>
+                                                <span class="font-weight-bold">{{$chartData['1_attempt'] ?? '0'}}</span>
+                                            </div>
+                                        </div>
+
+                                    </div> -->
+                           <!--          <div class="col-12 col-lg-20 px-2 px-lg-1 my-1">
+                     <div class="text-center">
+                                            <div class="status-text">2<sup>nd</sup> Attempt</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-info"></span>
+                                                <span class="font-weight-bold">{{$chartData['2_attempts'] ?? '0'}}</span>
+                                            </div>
+                                        </div>
+
+                                    </div> -->
+                           <!--          <div class="col-12 col-lg-20 px-2 px-lg-1 my-1">
+
+                                        <div class="text-center">
+                                            <div class="status-text">3<sup>rd</sup> Attempt</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-danger"></span>
+                                                <span class="font-weight-bold">{{$chartData['3_or_more_attempts'] ?? '0'}}</span>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4 px-3 py-2 p-md-2 p-lg-2" style="display:none;">
+                            <div class="cardd bg-white">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold">Learner Feedback</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="category_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row my-2 my-lg-2">
+                                    <div class="col-8 my-auto">
+                                        <div class="">
+                                            <h2 class="mb-0">100</h2>
+                                        </div>
+                                    </div>
+                                    <div class="col-4 my-auto">
+                                        <div class="row">
+                                            <div class="col-12 py-2 my-1">
+                                                <canvas id="learningFeedbackChart" class="" style="width:100%;height: auto;"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12 col-lg-3 px-2">
+                                        <div class="text-center">
+                                            <div class="status-text">Excellent</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-primary"></span>
+                                                <span class="font-weight-bold">287</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-lg-3 px-2">
+                                        <div class="text-center">
+                                            <div class="status-text">Good</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-warning"></span>
+                                                <span class="font-weight-bold">97</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-lg-2 px-2">
+                                        <div class="text-center">
+                                            <div class="status-text">Bad</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-success"></span>
+                                                <span class="font-weight-bold">28</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-lg-4 px-2">
+                                        <div class="text-center">
+                                            <div class="status-text">Need Improvement</div>
+                                            <div class="pt-1 d-flex align-items-center justify-content-center">
+                                                <span class="cardd-chat-circle bg-info"></span>
+                                                <span class="font-weight-bold">7</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4 px-3 py-2 p-md-2 p-lg-2" style="display:none;">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold">Learner Feedback</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="" class="dasboard-filters-drpdwn js-example-basic-single w-100 " name="">
+                                                <option value="" @if(request()->input('course_created_date') == '') selected @endif>Course Created Date</option>
+                                                <option value="1" @if(request()->input('course_created_date') == '1') selected @endif>Today</option>
+                                                <option value="2" @if(request()->input('course_created_date') == '2') selected @endif>Yesterday</option>
+                                                <option value="3" @if(request()->input('course_created_date') == '3') selected @endif>Last week</option>
+                                                <option value="4" @if(request()->input('course_created_date') == '4') selected @endif>This month</option>
+                                                <option value="5" @if(request()->input('course_created_date') == '5') selected @endif>Custom Range</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                     <div class="form-group row"> 
+                                        <div id="custom-range" class="form-group row" style="display: none;">
+                                            <div class="col-sm-6 my-2">
+                                                <label for="from_date">From Date:</label>
+                                                <input type="date" id="from_date" name="from_date" class="form-control" value="{{ request()->input('from_date') }}">
+                                            </div>
+                                            <div class="col-sm-6 my-2">
+                                                <label for="to_date">To Date:</label>
+                                                <input type="date" id="to_date" name="to_date" class="form-control" value="{{ request()->input('to_date') }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div>
+                                            <canvas id="loginHistorychart"  class="mt-3 mt-lg-4" style="width:100%;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        
+
+                        <div class="col-12 col-md-6 col-lg-6 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold dashboard-heading-border-styles">Courses Created</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="course_created_date" class="dasboard-filters-drpdwn js-example-basic-single w-100 course_created_date filters"  name="course_created_date">
+                                                <option value="" @if(request()->input('course_created_date') == '') selected @endif>Course Created Date</option>
+                                                <option value="1" @if(request()->input('course_created_date') == '1') selected @endif>Today</option>
+                                                <option value="2" @if(request()->input('course_created_date') == '2') selected @endif>Yesterday</option>
+                                                <option value="3" @if(request()->input('course_created_date') == '3') selected @endif>Last week</option>
+                                                <option value="4" @if(request()->input('course_created_date') == '4') selected @endif>This month</option>
+                                                <option value="5" @if(request()->input('course_created_date') == '5') selected @endif>Custom Range</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- <div class="form-group row"> 
+                                        <div id="custom-range" class="form-group row" style="display: none;">
+                                            <div class="col-sm-6 my-2">
+                                                <label for="from_date">From Date:</label>
+                                                <input type="date" id="from_date" name="from_date" class="form-control" value="{{ request()->input('from_date') }}">
+                                            </div>
+                                            <div class="col-sm-6 my-2">
+                                                <label for="to_date">To Date:</label>
+                                                <input type="date" id="to_date" name="to_date" class="form-control" value="{{ request()->input('to_date') }}">
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div>
+                                            <canvas id="coursesCreatedchart"  class="mt-3 mt-lg-4" style="width:100%;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-6 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold dashboard-heading-border-styles">Enrollment</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="enroll_created_date" class="dasboard-filters-drpdwn js-example-basic-single w-100 enroll_created_date filters" name="enroll_created_date">
+                                                <option value="" @if(request()->input('enroll_created_date') == '') selected @endif>Course Created Date</option>
+                                                <option value="1" @if(request()->input('enroll_created_date') == '1') selected @endif>Today</option>
+                                                <option value="2" @if(request()->input('enroll_created_date') == '2') selected @endif>Yesterday</option>
+                                                <option value="3" @if(request()->input('enroll_created_date') == '3') selected @endif>Last week</option>
+                                                <option value="4" @if(request()->input('enroll_created_date') == '4') selected @endif>This month</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        
+                                            <div>
+                                            <canvas id="enrollmentchart" class="mt-3 mt-lg-4" style="width: 100%;"></canvas>
+                                        </div>
+                                       
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-6 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold dashboard-heading-border-styles">High Performing Courses</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="highperform_category_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->highperform_category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12 mb-1">
+                                        <div>
+                                            <!-- <div class="fs-7 text-muted my-3 text-end">Completion Rate</div> -->
+                                            <div>
+                                                @foreach($topCourses as $index => $topcourse)
+                                                    @php
+                                                        $percentage = round($topcourse->completion_percentage) ?? 0;
+                                                        $color = '';
+                                                        if ($percentage >= 80) {
+                                                            $color = 'green'; 
+                                                        } elseif ($percentage >= 50) {
+                                                            $color = 'yellow'; 
+                                                        } else {
+                                                            $color = 'orange'; 
+                                                        }
+                                                    @endphp
+                                                    <div>
+                                                        <div class="mt-3 pt-2">
+                                                            <div class="row align-items-center">
+                                                                <div class="col-12 col-lg-8">
+                                                                    <div class="font-weight-500 mt-2 text-truncate">{{ $topcourse->course_name ?? '' }}</div>
+                                                                </div>
+                                                                <div class="col-12 col-lg-4">
+                                                                    <div class="text-end">
+                                                                        <span>Total-Users: {{ $topcourse->total_users ?? '' }}</span>
+                                                                        <span>{{ $percentage }}%</span><span class="pl-2">Completed</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <!-- <div class="font-weight-500 my-2 d-flex justify-content-between"><span>{{ $topcourse->course_name ?? '' }}</span><span>{{ $percentage }}%</span></div> -->
+                                                            <div class="progress list-view-p-bar mt-2">
+                                                                <div class="progress-bar progress-bar progress-bar-gradient" role="progressbar" style="width: {{ $percentage }}%;" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-6 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold dashboard-heading-border-styles">Low Performing Courses</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="lowperform_category_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->lowperform_category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                <div class="col-12 mb-1">
+                                    <div >
+                                        <!-- <div class="fs-7 text-muted my-3 text-end">Completion Rate</div> -->
+                                        <div >
+                                            @foreach($leastCompletedCourses as $index => $leastcourse)
+                                                @php
+                                                    $percentage = round($leastcourse->completion_percentage) ?? 0;
+                                                    $color = $percentage <= 100 ? 'red' : '';
+                                                @endphp
+                                                <div >
+                                                    <div class="mt-3 pt-2">
+                                                        <div class="row align-items-center">
+                                                            <div class="col-12 col-lg-8">
+                                                                <div class="font-weight-500 mt-2 text-truncate">{{ $leastcourse->course_name ?? '' }}  </div>
+                                                            </div>
+                                                            <div class="col-12 col-lg-4">
+                                                                <div class="text-end">
+                                                                    <span>Total-Users: {{ $leastcourse->total_users ?? '' }}</span>
+                                                                    <span>{{ $percentage }}%</span><span class="pl-2">Completed</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <!-- <div class="font-weight-500 my-2 d-flex justify-content-between"><span>{{ $leastcourse->course_name ?? '' }}</span><span>{{ $percentage }}%</span></div> -->
+                                                        <div class="progress list-view-p-bar mt-2">
+                                                            <div class="progress-bar progress-bar progress-bar-gradient" role="progressbar" style="width: {{ $percentage }}%;" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                        </div>
+                                                      
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            </div>
+                        </div>
+
+
+
+                        <div class="col-12 col-md-6 col-lg-6 px-3 py-2 p-md-2 p-lg-2">
+                            <div class="cardd bg-white h-100">
+                                <div class="row">
+                                    <div class="col-12 col-md-12 col-lg-6 my-lg-auto">
+                                        <div class="font-weight-bold dashboard-heading-border-styles">Oneweek Expiration Courses</div>
+                                    </div>
+                                    <div class="col-12 col-md-12 col-lg-6 mt-3 my-lg-auto">
+                                        <div class="d-flex align-items-center justify-content-end ps-0 ps-lg-2">
+                                            <i class="bi bi-filter"></i>
+                                            <select id="oneweek_category_id" class="dasboard-filters-drpdwn filters">
+                                                <option value="">All Catergories</option>
+                                                @foreach($category_list as $cat)
+                                                <option value="{{$cat->id}}" @if($request->lowperform_category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                <div class="col-12 mb-1">
+                                    <div >
+                                        <!-- <div class="fs-7 text-muted my-3 text-end">Completion Rate</div> -->
+                                        <div >
+                                            @foreach($oneweekCoursescount as $index => $onecourse)
+                                                
+                                                <div >
+                                                    <div class="mt-3 pt-2">
+                                                        <div class="row align-items-center">
+                                                            <div class="col-12 col-lg-8">
+                                                                <div class="font-weight-500 mt-2 text-truncate">{{ $onecourse->course_name ?? '' }}  </div>
+                                                            </div>
+                                                            <div class="col-12 col-lg-4">
+                                                                <div class="text-end">
+                                                                    <span>Total-Users: {{ $onecourse->Assigned_usersdetails->count() ?? '' }}</span>
+                                                                    <span></span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <!-- <div class="font-weight-500 my-2 d-flex justify-content-between"><span>{{ $leastcourse->course_name ?? '' }}</span><span>{{ $percentage }}%</span></div> -->
+                                                        <div class="progress list-view-p-bar mt-2">
+                                                            <div class="progress-bar progress-bar progress-bar-gradient" role="progressbar" style="width: 0%;" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                        </div>
+                                                      
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+
+            <div class="row px-2" style="display:none;">
+                <div class="col-12 col-lg-4 py-2">
+                    <div class="text-end mb-2">
+                        <label>Filter By</label>
+                        <select id="category_id" class="border border-grey py-1 px-2 ms-2 rounded-1 filters">
+                            <option value="">All Catergories</option>
+                            @foreach($category_list as $cat)
+                            <option value="{{$cat->id}}" @if($request->category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="table-responsive shadow-sm">
+                        <table class="table-bordered table">
+                            <thead>
+                                <th>Course Catalog</th>
+                                <th width="100" class="text-center">Count</th>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-chalkboard-user"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog?tab=2')}}" class="text-uppercase">Courses</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=1')}}" class="web-text-color">Add Course</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-info d-flex align-items-center justify-content-center">
+                                               {{$courses_count??0}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-regular fa-circle-check"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog?tab=2')}}" class="text-uppercase">Active Courses</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=2')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-danger d-flex align-items-center justify-content-center">
+                                               {{$active_courses_count??0}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-user-check"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog?tab=2')}}" class="text-uppercase">Assigned Courses</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=2')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-rblue d-flex align-items-center justify-content-center">
+                                               {{$assigned_courses_count??0}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-spinner"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog?tab=2')}}" class="text-uppercase">Inprogress Courses</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=2')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-maroon d-flex align-items-center justify-content-center">
+                                               {{$inprogress_courses_count}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-hourglass"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog?tab=2')}}" class="text-uppercase">Courses Not Started </a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=2')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-info d-flex align-items-center justify-content-center">
+                                               {{$assigned_courses_count-$inprogress_courses_count}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-file-circle-exclamation"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog??tab=2')}}" class="text-uppercase">Expired Courses</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=2')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-success d-flex align-items-center justify-content-center">
+                                               {{$expire_courses_count??0}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex">
+                                            <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                <i class="fa-solid fa-folder-tree"></i>
+                                            </div>
+                                            
+                                            <div class="pl-3">
+                                                <div class="mb-2">
+                                                    <a href="{{url('coursecatalog??tab=4')}}" class="text-uppercase">Catergories</a>
+                                                </div>
+                                                <small><a href="{{url('coursecatalog?tab=4')}}" class="web-text-color">View</a></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-success d-flex align-items-center justify-content-center">
+                                               {{count($category_list)}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4 py-2" style="display:none;">
+                    <div class="text-end mb-2">
+                        <label>Filter By</label>
+                        <select id="course_category_id" class="border border-grey py-1 px-2 ms-2 rounded-1 filters">
+                            <option value="">All Catergories</option>
+                            @foreach($category_list as $cat)
+                            <option value="{{$cat->id}}" @if($request->course_category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="shadow-sm borderr">
+                        <div class="graphs-heading-styles">Courses Assigned</div>
+                        <canvas id="userbarChart" class="p-2 bg-white" style="width:100%;max-width:600px; height: 236px;"></canvas>
+                    </div>
+                </div>
+
+                 <div class="col-12 col-lg-4 py-2" style="display:none;">
+                    <div class="text-end mb-2">
+                        <label>Filter By</label>
+                        <select id="course_created_category_id" class="border border-grey py-1 px-2 ms-2 rounded-1 filters">
+                            <option value="">All Catergories</option>
+                            @foreach($category_list as $cat)
+                            <option value="{{$cat->id}}" @if($request->course_created_category_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="shadow-sm borderr">
+                        <div class="graphs-heading-styles">Courses Created</div>
+                        <canvas id="userbarChart1" class="p-2 bg-white" style="width:100%;max-width:600px; height: 236px;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row px-2" style="display:none;">
+                <div class="col-12 col-lg-4 py-2">
+                    <div class="text-start my-2">
+                        <h4 class="mb-2 pb-1">Highest Performing Courses</h4>
+                    </div>
+                    <div class="table-responsive shadow-sm mt-2">
+                        <table class="table-bordered table">
+                            <thead>
+                                <th width="100">Courses</th>
+                                <th width="100">Assigned Users Count</th>
+                                <th width="100" class="text-center">Completed</th>
+                            </thead>
+                            <tbody>
+                                @foreach($topCourses as $topcourse)
+                                @php
+                                $percentage = round($topcourse->completion_percentage) ?? 0;
+                                $color = '';
+                                if ($percentage >= 80) {
+                                    $color = 'green'; 
+                                } elseif ($percentage >= 50) {
+                                    $color = 'yellow'; 
+                                } else {
+                                    $color = 'orange'; 
+                                }
+                                @endphp
+                                <tr>
+                                    <td>{{ $topcourse->course_name ?? '' }}</td>
+                                    <td>{{ $topcourse->total_users ?? '' }}</td>
+                                    <td style="background-color: {{ $color }}; color: white !important;">{{ $percentage }}%</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4 py-2" style="display:none;">
+                    <div class="text-start my-2">
+                        <h4 class="mb-2 pb-1">Lowest Performing Courses</h4>
+                    </div>
+                    <div class="table-responsive shadow-sm mt-2">
+                        <table class="table-bordered table">
+                            <thead>
+                                <th width="100">Courses</th>
+                                <th width="100">Assigned Users Count</th>
+                                <th width="100" class="text-center">Progress</th>
+                            </thead>
+                            <tbody>
+                                @foreach($leastCompletedCourses as $leastcourse)
+                                @php
+                                $percentage = round($leastcourse->completion_percentage) ?? 0;
+                                $color = '';
+                                if ($percentage <= 100) {
+                                    $color = 'red'; 
+                                }
+                                @endphp
+                                <tr>
+                                    <td>{{ $leastcourse->course_name ?? '' }}</td>
+                                    <td>{{ $leastcourse->total_users ?? '' }}</td>
+                                    <td style="background-color: {{ $color }}; color: white !important;">{{ $percentage }}%</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row px-2" style="display:none;"> 
+                <div class="col-12 col-lg-4 py-2 mt-3">
+                    <div class="text-end mb-2">
+                        <label>Filter By</label>
+                        <select id="cat_id" class="border border-grey py-1 px-2 ms-2 rounded-1 filters">
+                            <option value="">All Catergories</option>
+                            @foreach($category_list as $cat)
+                            <option value="{{$cat->id}}" @if($request->cat_id==$cat->id) Selected @endif>{{$cat->category_name}}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="table-responsive shadow-sm">
+                        <table class="table-bordered table">
+                            <thead>
+                                <th class="">Courses</th>
+                                <th width="100" class="text-center">Users Assigned</th>
+                                <th width="100" class="text-center">Pending </th>
+                                <th width="100" class="text-center">Inprogress </th>
+                                <th width="100" class="text-center">Completed </th>
+                            </thead>
+                            <tbody>
+                                @foreach($categoriesCounts as $category_count)
+                                <tr>
+                                    <td>
+                                        {{$category_count->course_name??''}}
+                                    </td>
+                                    <td>{{$category_count->user_count??''}}</td>
+                                    <td>{{$category_count->pending_status_count??''}}</td>
+
+                                    <td>{{$category_count->inprocess_status_count??''}}</td>
+                                    <td>{{$category_count->completed_status_count??''}}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4 py-2 mt-3">
+                    <div class="table-responsive shadow-sm">
+                        <div class="table-responsive shadow-sm">
+                            <table class="table-bordered table">
+                                <thead>
+                                    <th class="">Users</th>
+                                    <th width="100" class="text-center">Count</th>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex">
+                                                <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                    <i class="bi bi-person-circle"></i>
+                                                </div>
+
+                                                <div class="pl-3">
+                                                     <div class="mb-2">
+                                                        <a href="{{url('users?tab=2')}}" class="text-uppercase">Users</a>
+                                                    </div>
+                                                    <small><a href="{{url('users')}}" class="web-text-color">Add User</a></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <div class="count-bg bg-warning d-flex align-items-center justify-content-center">
+                                                   {{$user_count??0}}
+                                               </div>
+                                           </div>
+                                       </td>
+                                   </tr>                      
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row px-2" style="display:none;">
+                <div class="col-12 col-lg-4 py-2">
+                    <div class="text-end mb-2">
+                        <label>Filter By</label>
+                        <select class="border border-grey py-1 px-2 rounded-1">
+                            <option>Deparment</option>
+                            <option>----</option>
+                            <option>----</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive shadow-sm">
+                        <table class="table-bordered table">
+                            <thead>
+                                <th>score</th>
+                                <th class="text-center">No. of Users</th>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>50% - 70%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-info d-flex align-items-center justify-content-center">
+                                               10
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>70% - 90%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-info d-flex align-items-center justify-content-center">
+                                               10
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>90% Above</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="count-bg bg-info d-flex align-items-center justify-content-center">
+                                               10
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4 py-2" style="display:none;">
+                    <div class="text-end mb-2">
+                        <!-- <label>Filter By</label> -->
+                        <select class="border border-grey py-1 px-2 rounded-1">
+                            <option>Today</option>
+                            <option>Last Week</option>
+                            <option>Last Month</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive shadow-sm">
+                        <table class="table-bordered table">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>
+                                                No. of Login Users
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="">
+                                               {{$user_today_logins??0}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                
+                <!-- <div class="col-12 col-lg-4 py-2" style="display:none;">
+                    <div class="text-end mb-2">
+                        <select class="border border-grey py-1 px-2 rounded-1">
+                            <option>Today</option>
+                            <option>Tomorrow</option>
+                            <option>Next Week</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive shadow-sm">
+                        <table class="table-bordered table">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>
+                                                Average Spent Time
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="">
+                                               3 hours
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div> -->
+            </div>
+
+            <!-- <div class="row px-2">
+                <div class="col-12 col-lg-4 py-2">
+                    <div class="table-responsive shadow-sm">
+                        <div class="table-responsive shadow-sm">
+                            <table class="table-bordered table">
+                                <thead>
+                                    <th>Users</th>
+                                    <th width="100" class="text-center">Count</th>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex">
+                                                <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                    <i class="bi bi-person-circle"></i>
+                                                </div>
+                                                
+                                                <div class="pl-3">
+                                                     <div class="mb-2">
+                                                    <a href="{{url('users?tab=2')}}" class="text-uppercase">Users</a>
+                                                </div>
+                                                <small><a href="{{url('users')}}" class="web-text-color">Add Add User</a></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <div class="count-bg bg-warning d-flex align-items-center justify-content-center">
+                                                   {{$user_count??0}}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex">
+                                                <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                    <i class="bi bi-person-lines-fill"></i>
+                                                </div>
+                                                
+                                                <div class="pl-3">
+                                                    <div class="text-uppercase mb-2">User Type</div>
+                                                    <small class="d-flex justify-content-center align-items-center"><a href="#" class="web-text-color">Add User Type</a><i class="bi bi-dot pl-2 fs-4"></i> <span>17 May, 2024</span></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <div class="count-bg bg-primary d-flex align-items-center justify-content-center">
+                                                   30
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex">
+                                                <div class="circle-bg d-flex align-items-center justify-content-center">
+                                                    <i class="bi bi-people"></i>
+                                                </div>
+                                                
+                                                <div class="pl-3">
+                                                    <div class="text-uppercase mb-2">Groups</div>
+                                                    <small class="d-flex justify-content-center align-items-center"><a href="#" class="web-text-color">Add Group</a><i class="bi bi-dot pl-2 fs-4"></i> <span>19 May, 2024</span></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <div class="count-bg bg-secondary d-flex align-items-center justify-content-center">
+                                                   100
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4 py-2">
+                    <div class="shadow-sm borderr">
+                        <div class="bg-grey" style="padding: 14px;">User Report</div>
+                        <canvas id="userPieChart" class="p-2 bg-white" style="width:100%;max-width:600px; height: 224px;"></canvas>
+                    </div>
+                </div>
+            </div> -->
+
+              
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    var xValues = [ "Sunday","Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    var yValues = [55, 49, 44, 24, 15, 65, 72];
+    var barColors = ["red", "green","blue","orange","brown", "yellow", "violet"];
+
+    new Chart("loginHistorychart", {
+      type: "bar",
+      data: {
+        labels: xValues,
+        datasets: [{
+          backgroundColor: barColors,
+          data: yValues
+        }]
+      },
+      options: {
+        legend: {display: false},
+        title: {
+          display: true,
+        }
+      }
+    });
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var xValues = @json($xvalues);
+    var assignedYValues = @json($assignedyvalues);
+
+    new Chart("enrollmentchart", {
+      type: "bar",
+      data: {
+        labels: xValues,
+        datasets: [{
+          label: "Assigned Users",
+          backgroundColor: "#04a9f5",
+          data: assignedYValues
+        }]
+      },
+      options: {
+        responsive: true,
+        legend: { display: false },
+        title: {
+          display: true,
+          text: "Assigned Users Data",
+          fontSize: 16,
+          fontFamily: "'Roboto', 'Segoe UI', -apple-system, sans-serif",
+          fontColor: "#333333",
+          fontStyle: "600",
+          padding: 10
+        },
+        scales: {
+          yAxes: [{
+            ticks: {
+              beginAtZero: true,
+              precision: 0
+            },
+            scaleLabel: {
+              display: true,
+              labelString: 'Count',
+              fontSize: 13,
+              fontFamily: "'Roboto', 'Segoe UI', -apple-system, sans-serif",
+              fontColor: '#6c757d'
+            }
+          }],
+          xAxes: [{
+            ticks: {
+              fontFamily: "'Roboto', 'Segoe UI', -apple-system, sans-serif",
+              fontSize: 12,
+              fontColor: '#6c757d'
+            }
+          }]
+        }
+      }
+    });
+});
+</script>
+
+
+
+
+<script>
+    var xValues = <?php echo json_encode($xvalues); ?>;
+
+    //alert(xValues);
+    var yValues = <?php echo json_encode($courses_graph_count); ?>;
+    var barColors = ["orange","brown", "yellow", "violet", "red", "green","blue"];
+
+    new Chart("coursesCreatedchart", {
+      type: "bar",
+      data: {
+        labels: xValues,
+        datasets: [{
+          backgroundColor: barColors,
+          data: yValues
+        }]
+      },
+      options: {
+        legend: {display: false},
+        title: {
+          display: true,
+        }
+      }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+       // alert('hi');
+        var options = {
+            series: [
+                @json($active_courses_count),
+                @json($assigned_courses_count),
+                @json($inactive_courses_count)
+               
+            ],
+            labels: ["Active", "Assigned", "Inactive"],
+            legend: {
+                show: false
+            },
+            theme: {
+                palette: "palette1"
+            },
+            chart: {
+                type: "donut"
+            },
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '70%',
+                        labels: {
+                            show: false
+                        }
+                    }
+                }
+            },
+            colors: [
+                "#007bff", // blue
+                "#ffc107", // yellow
+                "#28a745"
+              
+            ],
+            tooltip: {
+                y: {
+                    formatter: function (value, { seriesIndex }) {
+                        // const labels = ["Active", "Assigned", "Inactive"];
+                        // return `${labels[seriesIndex]}: ${value}`;
+                        return `${value}`;
+                    }
+                }
+            }
+        };
+
+        new ApexCharts(document.querySelector("#coursePieChart"), options).render();
+    });
+</script>
+
+ <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+            var options = {
+                series: [
+                    @json($user_active_count),
+                    @json($user_enrolled_count)
+                ],
+                labels: ["Active", "Enrolled"],
+                legend: {
+                    show: false
+                },
+                theme: {
+                    palette: "palette1"
+                },
+                chart: {
+                    type: "donut"
+                },
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            size: '70%',
+                           labels: {
+                            show: false
+                         }
+                        }
+                    }
+                },
+                colors: [
+                    "#009eec", // Color for first segment
+                    "#ffc300" 
+                ],
+                tooltip: {
+                    y: {
+                        formatter: function (value, { seriesIndex }) {
+                            // const labels = ["Active", "Enrolled"];
+                            // return `${labels[seriesIndex]}: ${value}`;
+                              return `${value}`;
+                        }
+                    }
+                }
+            };
+
+            new ApexCharts(document.querySelector("#userPieChart"), options).render();
+        });
+    </script>
+
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Log chartData to verify it's being passed correctly
+        console.log(@json($chartData));
+
+        var options = {
+            series: [
+               
+                @json($chartData['total_active']),
+                @json($chartData['in_active']),
+
+            ],
+            labels: ["Active", "Inactive"],
+            chart: {
+                type: 'donut'
+            },
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '70%',
+                        labels: {
+                            show: false,
+                            name: {
+                                show: true
+                            },
+                            value: {
+                                show: true,
+                                fontSize: '14px',
+                                formatter: function(val) {
+                                    return val;
+                                }
+                            },
+                            total: {
+                                show: true,
+                                label: 'Total',
+                                formatter: function(w) {
+                                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            colors: [
+                "#009eec", "#ffc107"
+            ],
+            legend: {
+                show: false
+            },
+            tooltip: {
+                y: {
+                    formatter: function (value, { seriesIndex }) {
+                        // const labels = ["Active", "Inactive"];
+                        // return `${labels[seriesIndex]}: ${value}`;
+                        return `${value}`;
+                    }
+                }
+            }
+        };
+
+        var chart = new ApexCharts(document.querySelector("#assesmentPieChart"), options);
+        chart.render();
+    });
+</script>
+
+<script>
+    var xValues = [];
+    var yValues = [50, 20, 20, 10];
+    var barColors = [
+      "#b91d47",
+      "#00aba9",
+      "#2b5797",
+      "#e8c3b9",
+      "#1e7145"
+    ];
+
+    new Chart("learningFeedbackChart", {
+      type: "doughnut",
+      data: {
+        labels: xValues,
+        datasets: [{
+          backgroundColor: barColors,
+          data: yValues
+        }]
+      }
+    });
+</script>
+
+
+
+
+
+
+
+</script>
+    
+
+    <script type="text/javascript">
+        $('.filters').change(function(){
+            var category_id = $('#category_id').val();
+            var course_category_id = $('#course_category_id').val();
+            var course_created_category_id = $('#course_created_category_id').val();
+            var highperform_category_id = $('#highperform_category_id').val();
+            var lowperform_category_id = $('#lowperform_category_id').val();
+            var department_id = $('#department_id').val();
+            var enroll_created_date = $('#enroll_created_date').val();
+            var course_created_date = $('#course_created_date').val();
+            var assesment_category = $('#assesment_category').val();
+            var cat_id = $('#cat_id').val();
+
+
+
+             window.location.href="{{url('organizationdashboard')}}?category_id="+category_id+'&course_category_id='+course_category_id+'&cat_id='+cat_id+'&course_created_category_id='+course_created_category_id+'&highperform_category_id='+highperform_category_id+'&lowperform_category_id='+lowperform_category_id+'&department_id='+department_id+'&enroll_created_date='+enroll_created_date+'&assesment_category='+assesment_category+'&course_created_date='+course_created_date;
+        });
+    </script>
+
+    @include('layouts.admin.footer')
