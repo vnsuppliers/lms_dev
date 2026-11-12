@@ -26,6 +26,7 @@ use Zip;
 use App\Models\Assessment_results;
 use App\Models\Course_documents;
 use App\Models\ExamAttempt;
+use App\Models\Exam;
 use App\Models\AssessmentVideoAccess;
  use Barryvdh\DomPDF\Facade\Pdf;
  use App;
@@ -47,33 +48,49 @@ class UserprofileController extends Controller
                $q->whereDate('expiration_date','>=', date('Y-m-d'));  
         })->where('user_id',Auth::user()->id)->orderBy('updated_at','desc')->limit(3)->get();
 
-        //dd($recently);
-        $bookmark = Bookmark::whereHas('assign_details.course_details',function($q) use($request){  
-               $q->whereDate('expiration_date','>=', date('Y-m-d'));  
-        })->where('user_id',Auth::user()->id)->orderBy('id','desc')->limit(3)->get();
-
-        $expired = Asigneduser::has('category_details')->where('user_id',Auth::user()->id)->where('status','!=',3)->whereHas('course_data',function($q) use($request){  
-               $q->whereDate('expiration_date','<', date('Y-m-d'));  
-        })->with('course_data')->get()->sortByDesc(function($post) {
-                return $post->course_data->expiration_date;
-            });
+        // 1. Bookmarked courses for dashboard (fetches all bookmarked courses)
+        $bookmark = Bookmark::has('assign_details.course_details')
+            ->has('assign_details.category_details')
+            ->where('user_id', Auth::user()->id)
+            ->with(['assign_details.course_details', 'assign_details.category_details', 'assign_details.course_data'])
+            ->orderBy('id', 'desc')
+            ->get();
 
         $today = Carbon::today();
-     $oneMonthFromNow = $today->copy()->addMonth();
 
-$due_soon = Asigneduser::has('course_details')
-    ->has('category_details')
-    ->where('user_id', Auth::user()->id)
-    ->where('status','!=',3)
-    ->whereHas('course_details', function($q) use ($today, $oneMonthFromNow) {
-        $q->whereDate('expiration_date', '>=', $today)
-          ->whereDate('expiration_date', '<=', $oneMonthFromNow);
-    })
-    ->limit(3)
-    ->get()
-    ->sortBy(function($post) {
-        return $post->course_details->expiration_date;
-    });
+        $expired = Asigneduser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', Auth::user()->id)
+            ->where('status', '!=', 3)
+            ->whereHas('course_details', function($q) use ($today) {  
+                $q->whereNotNull('expiration_date')
+                  ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                  ->where('expiration_date', '!=', '1970-01-01')
+                  ->whereDate('expiration_date', '<', $today);  
+            })
+            ->with(['course_details', 'category_details', 'course_data'])
+            ->get()
+            ->sortByDesc(function($post) {
+                return $post->course_details->expiration_date ?? $post->course_data->expiration_date ?? '';
+            })
+            ->values();
+
+        $due_soon = Asigneduser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', Auth::user()->id)
+            ->where('status', '!=', 3)
+            ->whereHas('course_details', function($q) use ($today) {
+                $q->whereNotNull('expiration_date')
+                  ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                  ->where('expiration_date', '!=', '1970-01-01')
+                  ->whereDate('expiration_date', '>=', $today);
+            })
+            ->with(['course_details', 'category_details', 'course_data'])
+            ->get()
+            ->sortBy(function($post) {
+                return $post->course_details->expiration_date ?? '';
+            })
+            ->values();
 
         $recently_assign = Asigneduser::whereHas('course_details',function($q) use($request){  
                $q->whereDate('expiration_date','>=', date('Y-m-d'));  
@@ -134,167 +151,107 @@ $loginCounts = array_values($counts);
             $secondLastLogin = DB::table('tbl_user_login_history')->where('user_id', $user->id)->orderBy('login_time', 'desc')->first(); 
         }
 
-        // $total_courses =AsignedUser::where('user_id',$user->id)->whereHas('course_details', function($q) use ($request) {
-        //     $q->where('course_type', 1);
-          
-        //     if(!empty($request->category_id)){
-        //       $q->where('category_id', $request->category_id);
+        $todayStr = Carbon::today()->toDateString();
 
-        //     }
-        //      })->count();// Completed courses count
-        
-        $total_courses = AsignedUser::leftJoin('tbl_courses', 'tbl_courses.id', '=', 'tbl_assignedusers.course_id')
-            ->where('tbl_assignedusers.user_id', $user->id)
-            ->where(function ($q){
-                $q->where('tbl_courses.course_type', 1)
-                ->orWhereNull('tbl_courses.id'); 
+        $baseAssigned = AsignedUser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', $user->id)
+            ->whereHas('course_details', function($q) {
+                $q->where('course_type', 1);
             });
 
         if (!empty($request->category_id)) {
-            $total_courses->where('courses.category_id', $request->category_id);
+            $baseAssigned->where(function($q) use ($request) {
+                $q->where('category_id', $request->category_id)
+                  ->orWhereHas('course_details', function($sub) use ($request) {
+                      $sub->where('category_id', $request->category_id);
+                  });
+            });
         }
 
-        $total_courses = $total_courses->count();
-           
-        // $completed_course = AsignedUser::where('user_id', $user->id)
-        //     ->whereHas('course_details', function($q) use ($request) {
-        //         $q->where('course_type', 1);
-        //         if(!empty($request->category_id)){
-        //         $q->where('category_id', $request->category_id);
-        //         } 
-        //     })
-        //     ->where('status', 3)
-        //     ->count();
+        $total_courses = (clone $baseAssigned)->count();
 
-        $completed_course = AsignedUser::leftJoin('tbl_courses', 'tbl_courses.id', '=', 'tbl_assignedusers.course_id')
-            ->where('tbl_assignedusers.user_id', $user->id)
-            ->where('tbl_assignedusers.status', 3)
-            ->where(function ($q) {
-                $q->where('tbl_courses.course_type', 1)
-                ->orWhereNull('tbl_courses.id');
+        $completed_course = (clone $baseAssigned)->where('status', 3)->count();
+
+        $expired_count = (clone $baseAssigned)->where('status', '!=', 3)
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->whereNotNull('expiration_date')
+                  ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                  ->where('expiration_date', '!=', '1970-01-01')
+                  ->whereDate('expiration_date', '<', $todayStr);
+            })->count();
+
+        $inprogress_count = (clone $baseAssigned)->where('status', 1)
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->where(function ($expQ) use ($todayStr) {
+                    $expQ->whereNull('expiration_date')
+                         ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                         ->orWhere('expiration_date', '=', '1970-01-01')
+                         ->orWhereDate('expiration_date', '>=', $todayStr);
+                });
+            })->count();
+
+        $pending_count = (clone $baseAssigned)->where(function($q) {
+                $q->where('status', 0)->orWhereNull('status');
+            })
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->where(function ($expQ) use ($todayStr) {
+                    $expQ->whereNull('expiration_date')
+                         ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                         ->orWhere('expiration_date', '=', '1970-01-01')
+                         ->orWhereDate('expiration_date', '>=', $todayStr);
+                });
+            })->count();
+
+        $baseInstructor = AsignedUser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', $user->id)
+            ->whereHas('course_details', function($q) {
+                $q->where('course_type', 2);
             });
 
-        if (!empty($request->category_id)) {
-            $completed_course->where('tbl_courses.category_id', $request->category_id);
-        }
-
-        $completed_course = $completed_course->count();
-
-        // $inprogress_count = AsignedUser::where('user_id', $user->id)
-        //     ->whereHas('course_details', function($q) use ($request) {
-        //         $q->where('course_type', 1);
-        //          if(!empty($request->category_id)){
-        //           $q->where('category_id', $request->category_id);
-        //           }
-        //     })
-        //     ->where('status', 1)
-        //     ->count();
-
-
-        $inprogress_count = AsignedUser::leftJoin('tbl_courses', 'tbl_courses.id', '=', 'tbl_assignedusers.course_id')
-            ->where('tbl_assignedusers.user_id', $user->id)
-            ->where('tbl_assignedusers.status', 1)
-            ->where(function ($q) {
-                $q->where('tbl_courses.course_type', 1)
-                ->orWhereNull('tbl_courses.id');
+        if (!empty($request->instructor_category_id)) {
+            $baseInstructor->where(function($q) use ($request) {
+                $q->where('category_id', $request->instructor_category_id)
+                  ->orWhereHas('course_details', function($sub) use ($request) {
+                      $sub->where('category_id', $request->instructor_category_id);
+                  });
             });
-
-        if (!empty($request->category_id)) {
-            $inprogress_count->where('tbl_courses.category_id', $request->category_id);
         }
 
-        $inprogress_count = $inprogress_count->count();
+        $instructor_lead = (clone $baseInstructor)->count();
 
+        $instructor_completed_course = (clone $baseInstructor)->where('status', 3)->count();
 
+        $instructor_expired_count = (clone $baseInstructor)->where('status', '!=', 3)
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->whereNotNull('expiration_date')
+                  ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                  ->where('expiration_date', '!=', '1970-01-01')
+                  ->whereDate('expiration_date', '<', $todayStr);
+            })->count();
 
+        $instructor_inprogress_count = (clone $baseInstructor)->where('status', 1)
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->where(function ($expQ) use ($todayStr) {
+                    $expQ->whereNull('expiration_date')
+                         ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                         ->orWhere('expiration_date', '=', '1970-01-01')
+                         ->orWhereDate('expiration_date', '>=', $todayStr);
+                });
+            })->count();
 
-        // $pending_count = AsignedUser::where('user_id', $user->id)
-        //     ->where('course_details', function($q) use ($request) {
-        //         $q->where('course_type', 1);
-        //         if(!empty($request->category_id)){
-        //           $q->where('category_id', $request->category_id);
-        //           }
-        //     })
-        //     ->where('status', 0)
-        //     ->count();
-
-        $pending_count = AsignedUser::leftJoin('tbl_courses', 'tbl_courses.id', '=', 'tbl_assignedusers.course_id')
-            ->where('tbl_assignedusers.user_id', $user->id)
-            ->where('tbl_assignedusers.status', 0)
-            ->where(function ($q) use ($request) {
-                $q->where('tbl_courses.course_type', 1)
-                ->orWhereNull('tbl_courses.id'); // keeps missing ones
-            });
-
-        if (!empty($request->category_id)) {
-            $pending_count->where('courses.category_id', $request->category_id);
-        }
-
-        $pending_count = $pending_count->count();
-
-        // dd($pending_count);
-
-        $instructor_lead = AsignedUser::where('user_id', $user->id)
-            ->whereHas('course_details', function($q) use ($request) {
-                $q->where('course_type', 2);
-                if(!empty($request->category_id)){
-                  $q->where('category_id', $request->category_id);
-                  }
-                  if(!empty($request->instructor_category_id)){
-                  $q->where('category_id', $request->instructor_category_id);
-                  }
+        $instructor_pending_count = (clone $baseInstructor)->where(function($q) {
+                $q->where('status', 0)->orWhereNull('status');
             })
-            ->count();
-
-            // $instructor_lead=0;
-
-            $instructor_completed_course = AsignedUser::where('user_id', $user->id)
-            ->whereHas('course_details', function($q) use ($request) {
-                $q->where('course_type', 2);
-                if(!empty($request->instructor_category_id)){
-                $q->where('category_id', $request->instructor_category_id);
-                } 
-            })
-            ->where('status', 3)
-            ->count();
-           
-        $instructor_inprogress_count = AsignedUser::where('user_id', $user->id)
-            ->whereHas('course_details', function($q) use ($request) {
-                $q->where('course_type', 2);
-                 if(!empty($request->instructor_category_id)){
-                  $q->where('category_id', $request->instructor_category_id);
-                  }
-            })
-            ->where('status', 1)
-            ->count();
-        $instructor_pending_count = AsignedUser::where('user_id', $user->id)
-            ->whereHas('course_details', function($q) use ($request) {
-                $q->where('course_type', 2);
-                if(!empty($request->instructor_category_id)){
-                  $q->where('category_id', $request->instructor_category_id);
-                  }
-            })
-            ->where('status', 0)
-            ->count();
-
-        $expired_count = AsignedUser::where('user_id', $user->id)->where('status', 0)
-            ->whereHas('course_details', function($q) use ($request) {
-                  if(!empty($request->category_id)){
-                  $q->where('category_id', $request->category_id);
-                  }
-                  $q->whereDate('expiration_date', '<', now()->toDateString()); // Use `now()` for current date
-            }) 
-            ->count();
-
-            $instructor_expired_count = AsignedUser::where('user_id', $user->id)->where('status', 0)
-            ->whereHas('course_details', function($q) use ($request) {
-                $q->where('course_type', 2);
-                  if(!empty($request->instructor_category_id)){
-                  $q->where('category_id', $request->instructor_category_id);
-                  }
-                  $q->whereDate('expiration_date', '<', now()->toDateString()); // Use `now()` for current date
-            }) 
-            ->count();
+            ->whereHas('course_details', function($q) use ($todayStr) {
+                $q->where(function ($expQ) use ($todayStr) {
+                    $expQ->whereNull('expiration_date')
+                         ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                         ->orWhere('expiration_date', '=', '1970-01-01')
+                         ->orWhereDate('expiration_date', '>=', $todayStr);
+                });
+            })->count();
 
             $certificate_count = Asigneduser::where('user_id',Auth::user()->id)->where('status',3)->whereHas('course_details', function($q) use ($request) {
             if(!empty($request->certificate_category_id)){
@@ -510,34 +467,59 @@ foreach ($activities_data as $activity) {
             }
            
 
-        })->with('bookmark_data');
+        })->with(['course_details', 'category_details', 'bookmark_data']);
 
-        if($request->bookmark==1){
-           $list =$list->has('bookmark_data'); 
+        if ($request->menu == 'bookmarked' || $request->bookmark == 1) {
+            $list = $list->has('bookmark_data'); 
+        } elseif ($request->menu == 'expired') {
+            $list = $list->where('status', '!=', 3)
+                         ->whereHas('course_details', function($q) {
+                             $q->whereNotNull('expiration_date')
+                               ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                               ->where('expiration_date', '!=', '1970-01-01')
+                               ->whereDate('expiration_date', '<', \Carbon\Carbon::today());
+                         });
+        } elseif ($request->menu == 'due_soon' || $request->due_by == 'soon' || $request->menu == 'expire') {
+            $list = $list->where('status', '!=', 3)
+                         ->whereHas('course_details', function($q) {
+                             $q->whereNotNull('expiration_date')
+                               ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+                               ->where('expiration_date', '!=', '1970-01-01')
+                               ->whereDate('expiration_date', '>=', \Carbon\Carbon::today());
+                         });
+        } elseif ($request->assign_status == 3 || $request->menu == 'bookmark') {
+            $list = $list->where('status', 3); 
+        } elseif ($request->assign_status == 0 && $request->assign_status !== null && $request->assign_status !== '') {
+            $list = $list->where(function($q) {
+                             $q->where('status', 0)->orWhereNull('status');
+                         })
+                         ->whereHas('course_details', function($q) {
+                             $q->where(function ($expQ) {
+                                 $expQ->whereNull('expiration_date')
+                                      ->orWhereDate('expiration_date', '>=', \Carbon\Carbon::today())
+                                      ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                                      ->orWhere('expiration_date', '=', '1970-01-01');
+                             });
+                         });
+        } elseif ($request->menu == 'progress') {
+            $list = $list->where('status', 1)
+                         ->whereHas('course_details', function($q) {
+                             $q->where(function ($expQ) {
+                                 $expQ->whereNull('expiration_date')
+                                      ->orWhereDate('expiration_date', '>=', \Carbon\Carbon::today())
+                                      ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                                      ->orWhere('expiration_date', '=', '1970-01-01');
+                             });
+                         });
         }
 
-        if($request->assign_status==3){
-            
-           $list =$list->where('status',3); 
-        }elseif($request->assign_status ==0 &&  $request->assign_status!=""){
-            // dd('hii');
-          $list =$list->where('status',0); 
-        }else{
-        //dd('hi');
+        if ($request->menu == 'due_soon' || $request->due_by == 'soon' || $request->menu == 'expire') {
+            $list = $list->get()->sortBy(function($post) {
+                return $post->course_details->expiration_date ?? '';
+            })->values();
+        } else {
+            $list = $list->orderBy('id','desc')->get();
         }
-
-        if($request->assign_status==3){
-             //dd('hi');
-           $list =$list->where('status',3); 
-        }
-
-        
-         if($request->menu=='progress'){
-           // $list =$list->has('scorm_details'); 
-             $list =$list->where('status',1); 
-
-        }
-        $list =$list->orderBy('id','desc')->get();
       $courses_data = Asigneduser::with(['course_details','category_details'])->where('user_id',Auth::user()->id)->orderBy('id','desc')->where('id',0)->first();
         //   dd($courses_data);
 
@@ -570,10 +552,13 @@ foreach ($activities_data as $activity) {
 
         })->orderBy('category_name','ASC')->get();
 
-        // $countlist = Asigneduser::has('course_details')->has('category_details')->where('user_id',Auth::user()->id)->get();
-        $countlist = Asigneduser::with(['course_details', 'category_details'])
-        ->where('user_id', Auth::id())
-        ->get();
+        $countlist = Asigneduser::has('course_details')->has('category_details')
+            ->where('user_id', Auth::id())
+            ->whereHas('course_details', function ($q) {
+                $q->where('course_type', 1);
+            })
+            ->with(['course_details', 'category_details'])
+            ->get();
         // dd($countlist);
 
 
@@ -670,6 +655,21 @@ foreach ($activities_data as $activity) {
              ->orderBy('id', 'asc')
              ->get();
 
+         // Dynamically resolved application timezone & parser for timestamps
+         $appTimezone = config('app.timezone') ?: (date_default_timezone_get() ?: 'UTC');
+         $parseTimestamp = function($value) use ($appTimezone) {
+             if (empty($value)) return null;
+             if ($value instanceof \DateTimeInterface) {
+                 return Carbon::instance($value)->setTimezone($appTimezone);
+             }
+             $str = trim((string)$value);
+             if ($str === '') return null;
+             if (str_ends_with(strtoupper($str), 'Z')) {
+                 return Carbon::parse($str)->setTimezone($appTimezone);
+             }
+             return Carbon::parse($str, $appTimezone)->setTimezone($appTimezone);
+         };
+
          // 1. Total Learning Time (Time on Exam)
          $totalSeconds = 0;
          foreach ($assessmentResults as $res) {
@@ -677,7 +677,9 @@ foreach ($activities_data as $activity) {
              if (!empty($res->total_time_taken) && is_numeric($res->total_time_taken)) {
                  $sec = (int)$res->total_time_taken;
              } elseif (!empty($res->completed_at) && !empty($res->created_at)) {
-                 $sec = max(0, Carbon::parse($res->completed_at)->diffInSeconds(Carbon::parse($res->created_at)));
+                 $tComp = $parseTimestamp($res->completed_at);
+                 $tCreate = $parseTimestamp($res->created_at);
+                 $sec = ($tComp && $tCreate) ? max(0, abs($tComp->timestamp - $tCreate->timestamp)) : 0;
              }
              $totalSeconds += $sec;
          }
@@ -701,63 +703,106 @@ foreach ($activities_data as $activity) {
              $totalTimeFormatted = '0 min';
          }
 
-         // First Accessed & Last Accessed Date & Time
-         $earliestDate = null;
-         if ($assessmentResults->isNotEmpty()) {
-             $earliestDate = $assessmentResults->min('created_at');
-         }
-         if ($examAttempts->isNotEmpty()) {
-             $examMin = $examAttempts->min('created_at');
-             if (!$earliestDate || ($examMin && $examMin < $earliestDate)) {
-                 $earliestDate = $examMin;
-             }
-         }
-         $firstAccessedFormatted = $earliestDate ? Carbon::parse($earliestDate)->format('d M Y, h:i A') : 'Not Yet Accessed';
-
-         $latestDate = null;
+         // First Accessed & Last Accessed Date & Time (Dynamically converted to configured application/database timezone)
+         $allDates = [];
          foreach ($assessmentResults as $res) {
-             $d = $res->completed_at ?? $res->created_at;
-             if (!$latestDate || ($d && $d > $latestDate)) {
-                 $latestDate = $d;
-             }
+             if ($d1 = $parseTimestamp($res->created_at)) $allDates[] = $d1;
+             if ($d2 = $parseTimestamp($res->completed_at)) $allDates[] = $d2;
          }
          foreach ($examAttempts as $att) {
-             $d = $att->evaluation_completed_date ?? ($att->updated_at ?? $att->created_at);
-             if (!$latestDate || ($d && $d > $latestDate)) {
-                 $latestDate = $d;
-             }
+             if ($d1 = $parseTimestamp($att->created_at)) $allDates[] = $d1;
+             $evalDate = $att->evaluation_completed_date ?? $att->updated_at;
+             if ($d2 = $parseTimestamp($evalDate)) $allDates[] = $d2;
          }
-         $lastAccessedFormatted = $latestDate ? Carbon::parse($latestDate)->format('d M Y, h:i A') : 'Not Yet Accessed';
 
-         // 2. Assessments: No. of Attempts, Passed / Failed / Not Attempted, Highest & Lowest Score
-         $attemptCount = $assessmentResults->count() + $examAttempts->count();
+         if (!empty($allDates)) {
+             usort($allDates, function($a, $b) {
+                 return $a->timestamp <=> $b->timestamp;
+             });
+             $firstAccessedFormatted = $allDates[0]->format('d M Y, h:i A');
+             $lastAccessedFormatted = end($allDates)->format('d M Y, h:i A');
+         } else {
+             $firstAccessedFormatted = 'Not Yet Accessed';
+             $lastAccessedFormatted = 'Not Yet Accessed';
+         }
 
-         $hasAnyPassed = false;
-         foreach ($assessmentResults as $res) {
-             if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
-                 $hasAnyPassed = true;
-                 break;
-             } else {
-                 $payload = json_decode($res->result_data ?? '', true);
-                 $details = $payload['results'] ?? json_decode($res->results ?? '', true);
-                 $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
-                 if ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'])) {
-                     $hasAnyPassed = true;
-                     break;
+         // 2. Assessments: No. of Attempts, Passed / Failed / Not Attempted, Highest & Lowest Score (Take latest up to 3 valid attempts)
+         $rawAttemptCount = $assessmentResults->count() + $examAttempts->count();
+         $attemptCount = min(3, $rawAttemptCount);
+
+         $latestAssessmentResults = $assessmentResults->count() > 3 ? $assessmentResults->slice(-3)->values() : $assessmentResults;
+         $latestExamAttempts = $examAttempts->count() > 3 ? $examAttempts->slice(-3)->values() : $examAttempts;
+
+         // Check if course has active assessments (type 6) or active assignments (type 7)
+         $activeAssessments = Course_documents::where('course_id', $courses_data->course_id)
+             ->where('type', 6)
+             ->where('is_delete', 0)
+             ->where(function ($q) {
+                 $q->where('is_active', 1)->orWhereNull('is_active');
+             })
+             ->get();
+
+         $activeAssignments = Course_documents::where('course_id', $courses_data->course_id)
+             ->where('type', 7)
+             ->where('is_delete', 0)
+             ->where(function ($q) {
+                 $q->where('is_active', 1)->orWhereNull('is_active');
+             })
+             ->get();
+
+         $hasAssess = $activeAssessments->isNotEmpty();
+         $hasAssign = $activeAssignments->isNotEmpty();
+
+         $hasAllPassed = false;
+         if ($hasAssess || $hasAssign) {
+             $allAssessPassed = true;
+             if ($hasAssess) {
+                 foreach ($activeAssessments as $assess) {
+                     $passed = $assessmentResults->where('course_document_id', $assess->id)->contains(function($res) {
+                         if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
+                             return true;
+                         }
+                         $payload = json_decode($res->result_data ?? '', true);
+                         $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+                         $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                         return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+                     });
+                     if (!$passed) {
+                         $allAssessPassed = false;
+                         break;
+                     }
                  }
              }
-         }
 
-         if (!$hasAnyPassed) {
-             foreach ($examAttempts as $att) {
-                 if (strtolower(trim($att->exam_result ?? '')) === 'passed') {
-                     $hasAnyPassed = true;
-                     break;
+             $allAssignPassed = true;
+             if ($hasAssign) {
+                 $uniqueExamCodes = $activeAssignments->pluck('file_path')->filter()->unique();
+                 if ($uniqueExamCodes->isEmpty()) {
+                     $allAssignPassed = false;
+                 } else {
+                     foreach ($uniqueExamCodes as $examCode) {
+                         $exam = Exam::where('exam_code', $examCode)->first();
+                         if (!$exam) {
+                             $allAssignPassed = false;
+                             break;
+                         }
+                         $passed = $examAttempts->where('exam_id', $exam->id)->contains(function($att) {
+                             return strtolower(trim($att->exam_result ?? '')) === 'passed';
+                         });
+                         if (!$passed) {
+                             $allAssignPassed = false;
+                             break;
+                         }
+                     }
                  }
              }
+
+             $hasAllPassed = ($hasAssess ? $allAssessPassed : true) && ($hasAssign ? $allAssignPassed : true);
+         } else {
+             $hasAllPassed = ((int)($courses_data->status ?? 0) === 3);
          }
 
-         if ($hasAnyPassed) {
+         if ($hasAllPassed) {
              $passedInAttempt = 'Passed';
          } elseif ($attemptCount > 0) {
              $passedInAttempt = 'Failed';
@@ -769,7 +814,7 @@ foreach ($activities_data as $activity) {
          $attemptHistory = [];
          $itemIndex = 1;
 
-         foreach ($assessmentResults as $res) {
+         foreach ($latestAssessmentResults as $res) {
              $payload = json_decode($res->result_data ?? '', true);
              $details = $payload['results'] ?? json_decode($res->results ?? '', true);
              $score = null;
@@ -802,7 +847,7 @@ foreach ($activities_data as $activity) {
              ];
          }
 
-         foreach ($examAttempts as $att) {
+         foreach ($latestExamAttempts as $att) {
              $score = null;
              if (isset($att->percentage) && is_numeric($att->percentage)) {
                  $score = round((float)$att->percentage, 1);
@@ -820,18 +865,133 @@ foreach ($activities_data as $activity) {
              ];
          }
 
+         // If all passed, ensure passing score is preserved
+         if ($hasAllPassed) {
+             foreach ($assessmentResults as $res) {
+                 $payload = json_decode($res->result_data ?? '', true);
+                 $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+                 $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                 if ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'])) {
+                     if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                         $pScore = round((float)$details['percentage'], 1);
+                         if (!in_array($pScore, $scores)) {
+                             $scores[] = $pScore;
+                         }
+                     }
+                 }
+             }
+         }
+
          $highestScore = !empty($scores) ? max($scores) . '%' : '-';
          $lowestScore = !empty($scores) ? min($scores) . '%' : '-';
+
+         // 3. Build per-assessment dropdown options if course has multiple assessments/assignments
+         $assessmentOptions = [];
+         $assessmentOptionsMap = [];
+
+         foreach ($activeAssessments as $idx => $assess) {
+             $aRes = $assessmentResults->where('course_document_id', $assess->id);
+             $aCount = min(3, $aRes->count());
+             $aIsPassed = $aRes->contains(function($r) {
+                 if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
+                 $payload = json_decode($r->result_data ?? '', true);
+                 $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                 $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                 return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+             });
+
+             $aScores = [];
+             $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+             foreach ($aLatest as $r) {
+                 $payload = json_decode($r->result_data ?? '', true);
+                 $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                 if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                     $aScores[] = round((float)$details['percentage'], 1);
+                 }
+             }
+             if ($aIsPassed) {
+                 foreach ($aRes as $r) {
+                     $payload = json_decode($r->result_data ?? '', true);
+                     $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                     if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                         $pScore = round((float)$details['percentage'], 1);
+                         if (!in_array($pScore, $aScores)) $aScores[] = $pScore;
+                     }
+                 }
+             }
+
+             $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
+             $aKey = 'assess_' . $assess->id;
+             $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($idx + 1));
+
+             $optData = [
+                 'key' => $aKey,
+                 'name' => $aName,
+                 'type' => 'Assessment',
+                 'attempts' => $aCount,
+                 'status' => $aStatus,
+                 'highest_score' => !empty($aScores) ? max($aScores) . '%' : '-',
+                 'lowest_score' => !empty($aScores) ? min($aScores) . '%' : '-',
+             ];
+             $assessmentOptions[] = $optData;
+             $assessmentOptionsMap[$aKey] = $optData;
+         }
+
+         if ($hasAssign) {
+             $uniqueExamCodes = $activeAssignments->pluck('file_path')->filter()->unique();
+             foreach ($uniqueExamCodes as $examCode) {
+                 $exam = Exam::where('exam_code', $examCode)->first();
+                 $examName = $exam && !empty($exam->name) ? $exam->name : $examCode;
+                 $examId = $exam ? $exam->id : 0;
+                 $eAtts = $examAttempts->where('exam_id', $examId);
+                 $eCount = min(3, $eAtts->count());
+                 $eIsPassed = $eAtts->contains(fn($a) => strtolower(trim($a->exam_result ?? '')) === 'passed');
+
+                 $eScores = [];
+                 $eLatest = $eAtts->count() > 3 ? $eAtts->slice(-3)->values() : $eAtts;
+                 foreach ($eLatest as $a) {
+                     if (isset($a->percentage) && is_numeric($a->percentage)) {
+                         $eScores[] = round((float)$a->percentage, 1);
+                     }
+                 }
+
+                 $eStatus = $eIsPassed ? 'Passed' : ($eCount > 0 ? 'Failed' : 'Not Attempted');
+                 $eKey = 'exam_' . $examId;
+
+                 $optData = [
+                     'key' => $eKey,
+                     'name' => $examName,
+                     'type' => 'Assignment',
+                     'attempts' => $eCount,
+                     'status' => $eStatus,
+                     'highest_score' => !empty($eScores) ? max($eScores) . '%' : '-',
+                     'lowest_score' => !empty($eScores) ? min($eScores) . '%' : '-',
+                 ];
+                 $assessmentOptions[] = $optData;
+                 $assessmentOptionsMap[$eKey] = $optData;
+             }
+         }
+
+         $firstAssess = !empty($assessmentOptions) ? $assessmentOptions[0] : null;
+         $displayAttemptCount = $firstAssess ? $firstAssess['attempts'] : $attemptCount;
+         $displayPassedIn = $firstAssess ? $firstAssess['status'] : $passedInAttempt;
+         $displayHighestScore = $firstAssess ? $firstAssess['highest_score'] : $highestScore;
+         $displayLowestScore = $firstAssess ? $firstAssess['lowest_score'] : $lowestScore;
+
+         $hasMultipleAssessments = count($assessmentOptions) > 1;
 
          $reportData = [
              'total_time' => $totalTimeFormatted,
              'first_accessed' => $firstAccessedFormatted,
              'last_accessed' => $lastAccessedFormatted,
-             'attempt_count' => $attemptCount,
-             'passed_in' => $passedInAttempt,
-             'highest_score' => $highestScore,
-             'lowest_score' => $lowestScore,
-             'attempt_history' => $attemptHistory
+             'attempt_count' => $displayAttemptCount,
+             'passed_in' => $displayPassedIn,
+             'highest_score' => $displayHighestScore,
+             'lowest_score' => $displayLowestScore,
+             'attempt_history' => $attemptHistory,
+             'has_multiple_assessments' => $hasMultipleAssessments,
+             'assessment_options' => $assessmentOptions,
+             'assessment_options_map' => $assessmentOptionsMap
          ];
 
          $html = view('user.courses.ajax_page', compact(
@@ -1574,6 +1734,16 @@ public function fetch_myteam_userdetails(Request $request)
                 ], 422);
             }
 
+            $appTimezone = config('app.timezone') ?: (date_default_timezone_get() ?: 'UTC');
+            $completedAt = now();
+            if (!empty($list->completed_at)) {
+                try {
+                    $completedAt = Carbon::parse($list->completed_at)->setTimezone($appTimezone);
+                } catch (\Exception $e) {
+                    $completedAt = now();
+                }
+            }
+
             $data = Assessment_results::create([
                 'course_document_id' => $assessment->id,
                 'assign_id' => $assigned->id,
@@ -1582,7 +1752,7 @@ public function fetch_myteam_userdetails(Request $request)
                 'code' => $list->code ?? null,
                 'total_time_taken' => $list->total_time_taken ?? null,
                 'results' => json_encode($list->results ?? []),
-                'completed_at' => $list->completed_at ?? now(),
+                'completed_at' => $completedAt,
                 'status' => $list->status ?? null,
                 'quiz_data' => $request->quiz,
             ]);

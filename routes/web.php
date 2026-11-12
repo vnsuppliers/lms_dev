@@ -134,6 +134,7 @@ Route::get('logout', [LoginController::class, 'logout']);
   
     Route::get('organizationdashboard', [AdminRegistrationController::class, 'dashboard']);
     Route::get('users', [AdminRegistrationController::class, 'admin_users']);
+    Route::get('search_users_ajax', [AdminRegistrationController::class, 'search_users_ajax']);
     Route::post('user_registrations_store', [AdminRegistrationController::class, 'user_registrations_store']);
     Route::get('delete_admin_users', [AdminRegistrationController::class, 'delete_admin_users']);
     Route::get('/fetchUserData', [AdminRegistrationController::class, 'fetchUserData']);
@@ -159,6 +160,7 @@ Route::get('logout', [LoginController::class, 'logout']);
     Route::post('/reassign-assessment-to-all', [AdminCoursesController::class, 'reassignAssessmentToAll']);
     Route::get('delete_admin_courses', [AdminCoursesController::class, 'delete_admin_courses']);
     Route::get('fetch_course_details', [AdminCoursesController::class, 'fetch_course_details']);
+    Route::get('search_courses_ajax', [AdminCoursesController::class, 'search_courses_ajax']);
     Route::get('delete_document', [AdminCoursesController::class, 'delete_document']);
     Route::get('delete_trainer_details', [AdminCoursesController::class, 'delete_trainer_details']);
     Route::get('add_assessment_path_to_user', [AdminCoursesController::class, 'add_assessment_path_to_user']);
