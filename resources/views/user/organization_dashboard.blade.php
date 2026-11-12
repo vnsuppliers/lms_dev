@@ -45,6 +45,42 @@
         margin-top: 1.2rem;
     }
 
+    .dashboard-course-container {
+        position: relative;
+        background: #fff;
+        border-radius: 6px;
+    }
+    .dashboard-course-scroll-body {
+        max-height: 380px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+    }
+    .dashboard-course-scroll-body::-webkit-scrollbar {
+        width: 6px;
+    }
+    .dashboard-course-scroll-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    .dashboard-course-scroll-body::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+    .dashboard-course-scroll-body::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    .dashboard-course-sticky-footer {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        padding-top: 10px;
+        padding-bottom: 6px;
+        border-top: 1px solid #f0f0f0;
+        z-index: 10;
+        box-shadow: 0 -3px 8px rgba(0, 0, 0, 0.04);
+    }
+
     .user-profile-imagee {
     position: relative;
     display: inline-block;
@@ -317,7 +353,7 @@
                                                     @endif
                                                 </div>
                                                 <div class="row">
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-left text-lg-center">
                                                             <div class="fs-7 text-muted">Completed</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-start justify-content-lg-center">
@@ -326,7 +362,7 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-left text-lg-center">
                                                             <div class="fs-7 text-muted">In-progress</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-start justify-content-lg-center">
@@ -335,7 +371,7 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-left text-lg-center">
                                                             <div class="fs-7 text-muted">Pending</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-start justify-content-lg-center">
@@ -344,24 +380,15 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <!--   <div class="col-12 col-lg-3 px-2">
-                                                        <div class="text-center">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
+                                                        <div class="text-left text-lg-center">
                                                             <div class="fs-7 text-muted">Expired</div>
-                                                            <div class="pt-2 d-flex align-items-center justify-content-center">
-                                                                <span class="cardd-chat-circle bg-info"></span>
+                                                            <div class="pt-2 d-flex align-items-center justify-content-start justify-content-lg-center">
+                                                                <span class="cardd-chat-circle bg-danger"></span>
                                                                 <span class="font-weight-bold">{{$expired_count??'0'}}</span>
                                                             </div>
                                                         </div>
-                                                    </div> -->
-                                                    <!-- <div class="col-12 col-lg-20 px-2">
-                                                        <div class="text-center">
-                                                            <div class="fs-7 text-muted">Instructor-Led</div>
-                                                            <div class="pt-2 d-flex align-items-center justify-content-center">
-                                                                <span class="cardd-chat-circle bg-danger"></span>
-                                                                <span class="font-weight-bold">{{$instructor_lead??'0'}}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div> -->
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -403,7 +430,7 @@
                                               <div class="row {{ $instructor_lead <= 0 ? '' : '' }}">
 
                                                  @if($instructor_lead > 0)
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-center">
                                                             <div class="fs-7 text-muted">Completed</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-center">
@@ -412,7 +439,7 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-center">
                                                             <div class="fs-7 text-muted">In-progress</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-center">
@@ -421,7 +448,7 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div class="col-4 col-md-3 col-lg-3 p-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-center">
                                                             <div class="fs-7 text-muted">Pending</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-center">
@@ -430,25 +457,16 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    @endif
-                                                  <!--   <div class="col-12 col-lg-3 px-2">
+                                                    <div class="col-6 col-md-3 col-lg-3 p-2">
                                                         <div class="text-center">
                                                             <div class="fs-7 text-muted">Expired</div>
                                                             <div class="pt-2 d-flex align-items-center justify-content-center">
-                                                                <span class="cardd-chat-circle bg-info"></span>
+                                                                <span class="cardd-chat-circle bg-danger"></span>
                                                                 <span class="font-weight-bold">{{$instructor_expired_count??'0'}}</span>
                                                             </div>
                                                         </div>
-                                                    </div> -->
-                                                    <!-- <div class="col-12 col-lg-20 px-2">
-                                                        <div class="text-center">
-                                                            <div class="fs-7 text-muted">Instructor-Led</div>
-                                                            <div class="pt-2 d-flex align-items-center justify-content-center">
-                                                                <span class="cardd-chat-circle bg-danger"></span>
-                                                                <span class="font-weight-bold">{{$instructor_lead??'0'}}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div> -->
+                                                    </div>
+                                                  @endif
                                                 </div>
                                             </div>
                                         </div>
@@ -603,49 +621,51 @@
                                     </div>
                                      @else
                                     <div class="col-12 content-bg p-0 p-lg-2">
-                                        <div>
-                                            <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Recently Assigned Courses</label>
-                                        </div>
-                                        <div class="mt-3">
-                                            <table class="table border">
-                                                <tbody>
-                                                @foreach($recently_assign as $recent)
+                                        <div class="dashboard-course-container">
+                                            <div>
+                                                <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Recently Assigned Courses</label>
+                                            </div>
+                                            <div class="dashboard-course-scroll-body mt-2">
+                                                <table class="table border mb-0">
+                                                    <tbody>
+                                                    @foreach($recently_assign as $recent)
 
-                                                 <?php $events[]=['title'=>substr($recent->course_details->course_name,0,25),'start'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at)).".000000Z",'end'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at. ' + 1 hour')).".000000Z",'backgroundColor'=>'green','id'=>$recent->id]; ?>
-                                                <tr>
-                                                    <td class="p-2 border-top-0">
-                                                        <div class="row">
-                                                            <div class="col-lg-1p5">
-                                                                <div class="course-image-sm">
-                                                                    @php
-                                                                        $recentlyAssignImg = $recent->course_details->course_image ?? $recent->course_data->course_image ?? null;
-                                                                    @endphp
-                                                                    @if(!empty($recentlyAssignImg))
-                                                                        <img src="{{ url('storage/app/public/' . $recentlyAssignImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
-                                                                    @else
-                                                                        <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
-                                                                    @endif
+                                                     <?php $events[]=['title'=>substr($recent->course_details->course_name,0,25),'start'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at)).".000000Z",'end'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at. ' + 1 hour')).".000000Z",'backgroundColor'=>'green','id'=>$recent->id]; ?>
+                                                    <tr>
+                                                        <td class="p-2 border-top-0">
+                                                            <div class="row">
+                                                                <div class="col-lg-1p5">
+                                                                    <div class="course-image-sm">
+                                                                        @php
+                                                                            $recentlyAssignImg = $recent->course_details->course_image ?? $recent->course_data->course_image ?? null;
+                                                                        @endphp
+                                                                        @if(!empty($recentlyAssignImg))
+                                                                            <img src="{{ url('storage/app/public/' . $recentlyAssignImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
+                                                                        @else
+                                                                            <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-lg-10p5 ps-2 ps-lg-0 mt-2 mb-0 my-lg-auto">
+                                                                    <div>
+                                                                        <a href="{{url('start_course')}}?id={{$recent->id}}" class="course-name font-weight-bold">{{$recent->course_details->course_name??''}}</a>
+                                                                    </div>
+                                                                    <div class="py-1 sub-categories-styles">
+                                                                        <small class="d-flex justify-content-start align-items-center">
+                                                                        <span class="">{{$recent->category_details->category_name??''}}</span>
+                                                                            <i class="fa-solid fa-circle id-circle-icon pl-2"></i> 
+                                                                            <span>Assigned On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->format('F j, Y g:i a T') }}"> <?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->diffForHumans() ?></span>
+                                                                        </small>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <div class="col-lg-10p5 ps-2 ps-lg-0 mt-2 mb-0 my-lg-auto">
-                                                                <div>
-                                                                    <a href="{{url('start_course')}}?id={{$recent->id}}" class="course-name font-weight-bold">{{$recent->course_details->course_name??''}}</a>
-                                                                </div>
-                                                                <div class="py-1 sub-categories-styles">
-                                                                    <small class="d-flex justify-content-start align-items-center">
-                                                                    <span class="">{{$recent->category_details->category_name??''}}</span>
-                                                                        <i class="fa-solid fa-circle id-circle-icon pl-2"></i> 
-                                                                        <span>Assigned On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->format('F j, Y g:i a T') }}"> <?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->diffForHumans() ?></span>
-                                                                    </small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                 @endforeach
-                                                </tbody>
-                                            </table>
-                                            <div class="text-end mt-2">
+                                                        </td>
+                                                    </tr>
+                                                     @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="dashboard-course-sticky-footer text-end mt-2">
                                                 <a href="{{url('user_courses')}}" class="btn web-btn btn-sm">View All</a>
                                             </div>
                                         </div>
@@ -663,48 +683,61 @@
                                     </div>
                                      @else
                                     <div class="col-12 content-bg p-0 p-lg-2">
-                                        <div>
-                                            <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Courses Due Soon</label>
-                                        </div>
-                                        <div class="mt-3">
-                                            <table class="table border">
-                                                <tbody>
-                                                @foreach($due_soon as $recent)
-                                                 <?php $events[]=['title'=>substr($recent->course_details->course_name,0,25),'start'=>date('Y-m-d',strtotime($recent->course_data->expiration_date)).'T'.date('H:i:s',strtotime($recent->course_data->expiration_date)).".000000Z",'end'=>date('Y-m-d',strtotime($recent->course_data->expiration_date)).'T'.date('H:i:s',strtotime($recent->course_data->expiration_date. ' + 1 hour')).".000000Z",'backgroundColor'=>'red','id'=>$recent->id]; ?>
-                                                    <tr>
-                                                        <td class="p-2 border-top-0">
-                                                            <div class="row">
-                                                                <div class="col-4 col-md-3 col-lg-1p5">
-                                                                    <div class="course-image-sm">
-                                                                        @php
-                                                                            $dueSoonCourseImg = $recent->course_details->course_image ?? $recent->course_data->course_image ?? null;
-                                                                        @endphp
-                                                                        @if(!empty($dueSoonCourseImg))
-                                                                            <img src="{{ url('storage/app/public/' . $dueSoonCourseImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
-                                                                        @else
-                                                                            <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
-                                                                        @endif
+                                        <div class="dashboard-course-container">
+                                            <div>
+                                                <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Courses Due Soon</label>
+                                            </div>
+                                            <div class="dashboard-course-scroll-body mt-2">
+                                                <table class="table border mb-0">
+                                                    <tbody>
+                                                    @foreach($due_soon as $recent)
+                                                        @php
+                                                            $dueCourseExp = $recent->course_details->expiration_date ?? $recent->course_data->expiration_date ?? null;
+                                                            if ($dueCourseExp) {
+                                                                $events[] = [
+                                                                    'title' => substr($recent->course_details->course_name ?? 'Course', 0, 25),
+                                                                    'start' => date('Y-m-d\TH:i:s.000000\Z', strtotime($dueCourseExp)),
+                                                                    'end' => date('Y-m-d\TH:i:s.000000\Z', strtotime($dueCourseExp . ' + 1 hour')),
+                                                                    'backgroundColor' => 'red',
+                                                                    'id' => $recent->id
+                                                                ];
+                                                            }
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="p-2 border-top-0">
+                                                                <div class="row">
+                                                                    <div class="col-4 col-md-3 col-lg-1p5">
+                                                                        <div class="course-image-sm">
+                                                                            @php
+                                                                                $dueSoonCourseImg = $recent->course_details->course_image ?? $recent->course_data->course_image ?? null;
+                                                                            @endphp
+                                                                            @if(!empty($dueSoonCourseImg))
+                                                                                <img src="{{ url('storage/app/public/' . $dueSoonCourseImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
+                                                                            @else
+                                                                                <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-8 col-lg-9 col-lg-10p5 ps-0 ps-lg-0 mt-1 mt-lg-2 mb-0 my-lg-auto">
+                                                                        <div>
+                                                                            <a href="{{url('start_course')}}?id={{$recent->id}}" class="course-name font-weight-bold">{{$recent->course_details->course_name??''}}</a>
+                                                                        </div>
+                                                                        <div class="py-1 sub-categories-styles">
+                                                                            <small class="d-flex justify-content-start align-items-center">
+                                                                                <span class="">{{$recent->category_details->category_name??''}}</span>
+                                                                                <i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Due :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_details->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_details->expiration_date))->diffForHumans() ?></span>
+                                                                            </small>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div class="col-8 col-lg-9 col-lg-10p5 ps-0 ps-lg-0 mt-1 mt-lg-2 mb-0 my-lg-auto">
-                                                                    <div>
-                                                                        <a href="{{url('start_course')}}?id={{$recent->id}}" class="course-name font-weight-bold">{{$recent->course_details->course_name??''}}</a>
-                                                                    </div>
-                                                                    <div class="py-1 sub-categories-styles">
-                                                                        <small class="d-flex justify-content-start align-items-center">
-                                                                            <span class="">{{$recent->category_details->category_name??''}}</span>
-                                                                            <i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Due :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_details->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_details->expiration_date))->diffForHumans() ?></span>
-                                                                        </small>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                            <div class="text-end mt-2">
-                                                <a href="{{url('user_courses')}}?expire=1&menu=expire" class="btn web-btn btn-sm">View All</a>
+                                                            </td>
+                                                        </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="dashboard-course-sticky-footer text-end mt-2">
+                                                <a href="{{url('user_courses')}}?menu=due_soon" class="btn web-btn btn-sm">View All</a>
                                             </div>
                                         </div>
                                     </div>
@@ -721,57 +754,69 @@
                                     </div>
                                      @else
                                     <div class="col-12 content-bg p-0 p-lg-2">
-                                        <div>
-                                            <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Courses Expired</label>
-                                        </div>
-                                        <div class="mt-3">
-                                            <table class="table border">
-                                                <tbody>
-                                                         @foreach($expired as $recent)
-
-                                                          <?php $events[]=['title'=>substr($recent->course_data->course_name,0,25),'start'=>date('Y-m-d',strtotime($recent->course_data->expiration_date)).'T'.date('H:i:s',strtotime($recent->course_data->expiration_date)).".000000Z",'end'=>date('Y-m-d',strtotime($recent->course_data->expiration_date)).'T'.date('H:i:s',strtotime($recent->course_data->expiration_date. ' + 1 hour')).".000000Z",'backgroundColor'=>'grey','id'=>$recent->id]; ?>
-                                                    <tr>
-                                                        <td class="p-2 border-top-0">
-                                                            <div class="row">
-                                                                <div class="col-4 col-md-3 col-lg-1p5">
-                                                                    <div class="course-image-sm">
-                                                                        @php
-                                                                            $expiredCourseImg = $recent->course_data->course_image ?? $recent->course_details->course_image ?? null;
-                                                                        @endphp
-                                                                        @if(!empty($expiredCourseImg))
-                                                                            <img src="{{ url('storage/app/public/' . $expiredCourseImg) }}" class="img-fluid w-100 rounded-3" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
-                                                                        @else
-                                                                            <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" alt="">
-                                                                        @endif
+                                        <div class="dashboard-course-container">
+                                            <div>
+                                                <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Courses Expired</label>
+                                            </div>
+                                            <div class="dashboard-course-scroll-body mt-2">
+                                                <table class="table border mb-0">
+                                                    <tbody>
+                                                             @foreach($expired as $recent)
+                                                                @php
+                                                                    $expCourseExp = $recent->course_details->expiration_date ?? $recent->course_data->expiration_date ?? null;
+                                                                    if ($expCourseExp) {
+                                                                        $events[] = [
+                                                                            'title' => substr($recent->course_details->course_name ?? $recent->course_data->course_name ?? 'Course', 0, 25),
+                                                                            'start' => date('Y-m-d\TH:i:s.000000\Z', strtotime($expCourseExp)),
+                                                                            'end' => date('Y-m-d\TH:i:s.000000\Z', strtotime($expCourseExp . ' + 1 hour')),
+                                                                            'backgroundColor' => 'grey',
+                                                                            'id' => $recent->id
+                                                                        ];
+                                                                    }
+                                                                @endphp
+                                                        <tr>
+                                                            <td class="p-2 border-top-0">
+                                                                <div class="row">
+                                                                    <div class="col-4 col-md-3 col-lg-1p5">
+                                                                        <div class="course-image-sm">
+                                                                            @php
+                                                                                $expiredCourseImg = $recent->course_data->course_image ?? $recent->course_details->course_image ?? null;
+                                                                            @endphp
+                                                                            @if(!empty($expiredCourseImg))
+                                                                                <img src="{{ url('storage/app/public/' . $expiredCourseImg) }}" class="img-fluid w-100 rounded-3" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
+                                                                            @else
+                                                                                <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" alt="">
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-8 col-lg-9 col-lg-10p5 ps-0 ps-lg-0 mt-1 mt-lg-2 mb-0 my-lg-auto">
+                                                                        <div>
+                                                                            <a href="javascript:;" class="course-name font-weight-bold">{{$recent->course_data->course_name??''}}</a>
+                                                                        </div>
+                                                                        <div class="py-1 sub-categories-styles d-none d-md-block">
+                                                                            <small class="d-flex justify-content-start align-items-center">
+                                                                                <span class="">{{$recent->category_details->category_name??''}}</span>
+                                                                                    <i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Expired On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->diffForHumans() ?></span>
+                                                                            </small>
+                                                                        </div>
+                                                                        <div class="py-1 sub-categories-styles d-block d-md-none">
+                                                                            <small class="">
+                                                                                <div class="">{{$recent->category_details->category_name??''}}</div>
+                                                                                <div class="pt-1"><span>Expired On :</span>
+                                                                                    <span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->diffForHumans() ?></span>
+                                                                                </div>
+                                                                            </small>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div class="col-8 col-lg-9 col-lg-10p5 ps-0 ps-lg-0 mt-1 mt-lg-2 mb-0 my-lg-auto">
-                                                                    <div>
-                                                                        <a href="javascript:;" class="course-name font-weight-bold">{{$recent->course_data->course_name??''}}</a>
-                                                                    </div>
-                                                                    <div class="py-1 sub-categories-styles d-none d-md-block">
-                                                                        <small class="d-flex justify-content-start align-items-center">
-                                                                            <span class="">{{$recent->category_details->category_name??''}}</span>
-                                                                                <i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Expired On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->diffForHumans() ?></span>
-                                                                        </small>
-                                                                    </div>
-                                                                    <div class="py-1 sub-categories-styles d-block d-md-none">
-                                                                        <small class="">
-                                                                            <div class="">{{$recent->category_details->category_name??''}}</div>
-                                                                            <div class="pt-1"><span>Expired On :</span>
-                                                                                <span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->course_data->expiration_date))->diffForHumans() ?></span>
-                                                                            </div>
-                                                                        </small>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                            <div class="text-end mt-2">
-                                                <a href="{{url('user_courses')}}" class="btn web-btn btn-sm">View All</a>
+                                                            </td>
+                                                        </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="dashboard-course-sticky-footer text-end mt-2">
+                                                <a href="{{url('user_courses')}}?menu=expired" class="btn web-btn btn-sm">View All</a>
                                             </div>
                                         </div>
                                     </div>
@@ -798,45 +843,60 @@
                                     </div>
                                      @else
                                     <div class="col-12 content-bg p-0 p-lg-2">
-                                        <div>
-                                            <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Bookmarked Courses</label>
-                                        </div>
-                                        <div class="mt-2 mt-lg-3">
-                                            <table class="table border">
-                                                <tbody>
-                                                     @foreach($bookmark as $recent)
-                                                      <?php $events[]=['title'=>substr($recent->assign_details->course_details->course_name,0,25),'start'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at)).".000000Z",'end'=>date('Y-m-d',strtotime($recent->created_at)).'T'.date('H:i:s',strtotime($recent->created_at. ' + 1 hour')).".000000Z",'backgroundColor'=>'#f69336','id'=>$recent->assign_details->id]; ?>
-                                                    <tr>
-                                                        <td class="p-2 border-top-0">
-                                                            <div class="row">
-                                                                <div class="col-lg-1p5">
-                                                                    <div class="course-image-sm">
-                                                                        @php
-                                                                            $bookmarkCourseImg = $recent->assign_details->course_details->course_image ?? $recent->assign_details->course_data->course_image ?? null;
-                                                                        @endphp
-                                                                        @if(!empty($bookmarkCourseImg))
-                                                                            <img src="{{ url('storage/app/public/' . $bookmarkCourseImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
-                                                                        @else
-                                                                            <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
-                                                                        @endif
+                                        <div class="dashboard-course-container">
+                                            <div>
+                                                <label class="mb-2 font-weight-bold d-flex align-items-center fs-6 px-2 py-1 border-left-3p-b7">Bookmarked Courses</label>
+                                            </div>
+                                            <div class="dashboard-course-scroll-body mt-2">
+                                                <table class="table border mb-0">
+                                                    <tbody>
+                                                         @foreach($bookmark as $recent)
+                                                            @php
+                                                                $bkTitle = $recent->assign_details->course_details->course_name ?? $recent->assign_details->course_data->course_name ?? 'Course';
+                                                                $bkDate = $recent->created_at ?? now();
+                                                                $events[] = [
+                                                                    'title' => substr($bkTitle, 0, 25),
+                                                                    'start' => date('Y-m-d\TH:i:s.000000\Z', strtotime($bkDate)),
+                                                                    'end' => date('Y-m-d\TH:i:s.000000\Z', strtotime($bkDate . ' + 1 hour')),
+                                                                    'backgroundColor' => '#f69336',
+                                                                    'id' => $recent->assign_details->id ?? $recent->id
+                                                                ];
+                                                            @endphp
+                                                        <tr>
+                                                            <td class="p-2 border-top-0">
+                                                                <div class="row">
+                                                                    <div class="col-lg-1p5">
+                                                                        <div class="course-image-sm">
+                                                                            @php
+                                                                                $bookmarkCourseImg = $recent->assign_details->course_details->course_image ?? $recent->assign_details->course_data->course_image ?? null;
+                                                                            @endphp
+                                                                            @if(!empty($bookmarkCourseImg))
+                                                                                <img src="{{ url('storage/app/public/' . $bookmarkCourseImg) }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="" onerror="this.onerror=null; this.src='{{ url('public/images/course.jpg') }}';">
+                                                                            @else
+                                                                                <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" style="height: auto !important;" alt="">
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-10p5 px-2 ps-lg-0 my-auto">
+                                                                        <div>
+                                                                            <a href="{{url('start_course')}}?id={{$recent->assign_id}}" class="course-name font-weight-bold">{{$recent->assign_details->course_details->course_name??''}}</a>
+                                                                        </div>
+                                                                        <div class="py-1 sub-categories-styles">
+                                                                            <small class="d-flex justify-content-start align-items-center">
+                                                                                <span class="">{{$recent->assign_details->category_details->category_name??''}}</span><i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Bookmarked On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->diffForHumans() ?></span>
+                                                                            </small>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div class="col-lg-10p5 px-2 ps-lg-0 my-auto">
-                                                                    <div>
-                                                                        <a href="{{url('start_course')}}?id={{$recent->assign_id}}" class="course-name font-weight-bold">{{$recent->assign_details->course_details->course_name??''}}</a>
-                                                                    </div>
-                                                                    <div class="py-1 sub-categories-styles">
-                                                                        <small class="d-flex justify-content-start align-items-center">
-                                                                            <span class="">{{$recent->assign_details->category_details->category_name??''}}</span><i class="fa-solid fa-circle id-circle-icon pl-2"></i> <span>Bookmarked On :</span><span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->format('F j, Y g:i a T') }}"><?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($recent->created_at))->diffForHumans() ?></span>
-                                                                        </small>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                                </tbody>
-                                            </table>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="dashboard-course-sticky-footer text-end mt-2">
+                                                <a href="{{url('user_courses')}}?menu=bookmarked" class="btn web-btn btn-sm">View All</a>
+                                            </div>
                                         </div>
                                     </div>
                                     @endif
@@ -1060,7 +1120,7 @@
         var completedCount = @json($completed_course);
         var inprogressCount = @json($inprogress_count);
         var pendingCount = @json($pending_count);
-        // var expiredCount = @json($expired_count);
+        var expiredCount = @json($expired_count);
         
         var e = {
             460: function () {
@@ -1068,9 +1128,9 @@
                     const e = {
                         init() {
                             new ApexCharts(document.querySelector("#bsb-chart"), {
-                                series: [completedCount, inprogressCount, pendingCount],
+                                series: [completedCount, inprogressCount, pendingCount, expiredCount],
 
-                                labels: ["Completed", "In-Progress", "Pending"],
+                                labels: ["Completed", "In-Progress", "Pending", "Expired"],
                                 legend: {
                                     show: false // Hides the legend
                                 },
@@ -1088,8 +1148,8 @@
                                 colors: [
                                     "#009eec", 
                                     "#ffc300", 
-                                    "#40c1c0"
-                                  
+                                    "#40c1c0",
+                                    "#dc3545"
                                 ],
                                 // tooltip: {
                                 //     y: {
@@ -1148,7 +1208,7 @@
         var instructor_completedCount = @json($instructor_completed_course);
         var instructor_inprogressCount = @json($instructor_inprogress_count);
         var instructor_pendingCount = @json($instructor_pending_count);
-        // var instructor_expiredCount = @json($instructor_expired_count);
+        var instructor_expiredCount = @json($instructor_expired_count);
         
         var e = {
             460: function () {
@@ -1156,9 +1216,9 @@
                     const e = {
                         init() {
                             new ApexCharts(document.querySelector("#instructor_bsb-chart"), {
-                                series: [instructor_completedCount, instructor_inprogressCount, instructor_pendingCount],
+                                series: [instructor_completedCount, instructor_inprogressCount, instructor_pendingCount, instructor_expiredCount],
 
-                                labels: ["Completed", "In-Progress", "Pending"],
+                                labels: ["Completed", "In-Progress", "Pending", "Expired"],
                                 legend: {
                                     show: false // Hides the legend
                                 },
@@ -1177,7 +1237,7 @@
                                     "#009eec", 
                                     "#ffc300", 
                                     "#40c1c0", 
-                                    "#911a79"  
+                                    "#dc3545"  
                                 ],
                             }).render();
                         },

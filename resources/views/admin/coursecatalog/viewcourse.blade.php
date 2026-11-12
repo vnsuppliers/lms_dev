@@ -1,5 +1,182 @@
 
 @if(hasPermission(4))
+<style>
+    /* Ensure course name and details are completely shown with full text (no ellipsis ...) */
+    #courses_list_div .course-name,
+    #course_catalog_left_panel .course-name,
+    .laft-syde-content .course-name,
+    a.course-name {
+        display: block !important;
+        height: auto !important;
+        min-height: 20px !important;
+        max-height: none !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        -webkit-line-clamp: unset !important;
+        line-clamp: unset !important;
+        -webkit-box-orient: unset !important;
+        box-orient: unset !important;
+        line-height: 1.4 !important;
+    }
+
+    #courses_list_div .course-title-container {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: visible !important;
+    }
+
+    /* Course search autocomplete dropdown */
+    .course-search-results-dropdown {
+        width: max-content !important;
+        min-width: 380px !important;
+        max-width: 540px !important;
+        right: 0 !important;
+        left: auto !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        border-radius: 6px !important;
+        border: 1px solid #cbd5e1 !important;
+        background-color: #ffffff !important;
+    }
+    .course-search-item {
+        transition: background-color 0.15s ease-in-out;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+    }
+    .course-search-item:last-child {
+        border-bottom: none;
+    }
+    .course-search-item:hover,
+    .course-search-item.active-item {
+        background-color: #f1f8f7;
+    }
+    .course-badge-dept {
+        background-color: #e6f4f2;
+        color: #005452;
+        border: 1px solid #b2dfdb;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    /* Left panel styling: allows dragging wide to the right without being capped by col-lg-4 */
+    #course_catalog_left_panel {
+        max-width: none !important;
+        overflow: visible !important;
+        z-index: 10 !important;
+    }
+
+    /* Draggable Splitter Handle attached to the right edge of the Course List */
+    .course-split-divider {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: -9px;
+        width: 18px;
+        z-index: 105;
+        cursor: col-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .course-split-divider::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 8px;
+        width: 2px;
+        background-color: #b2dfdb;
+        transition: background-color 0.2s ease;
+    }
+
+    .course-split-divider:hover::before,
+    .course-split-divider.active::before {
+        background-color: #005452;
+    }
+
+    .course-drag-grip {
+        width: 18px;
+        height: 54px;
+        background: #005452;
+        color: #ffffff;
+        border: 1px solid #003e3d;
+        border-radius: 9px;
+        box-shadow: 0 2px 8px rgba(0, 84, 82, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: col-resize;
+        transition: transform 0.15s ease, background-color 0.15s ease;
+        z-index: 2;
+    }
+
+    .course-drag-grip i {
+        font-size: 11px;
+        color: #ffffff;
+    }
+
+    .course-split-divider:hover .course-drag-grip,
+    .course-split-divider.active .course-drag-grip {
+        background-color: #007a77;
+        box-shadow: 0 4px 14px rgba(0, 84, 82, 0.65);
+        transform: scale(1.12);
+    }
+
+    /* While actively dragging */
+    body.course-split-resizing {
+        cursor: col-resize !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
+
+    body.course-split-resizing * {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
+
+    body.course-split-resizing #course_catalog_left_panel,
+    body.course-split-resizing #course_catalog_right_panel,
+    body.course-split-resizing #course_catalog_drag_handle {
+        transition: none !important;
+    }
+
+    /* Hidden when left panel is closed/collapsed */
+    .laft-syde-content.closed #course_catalog_drag_handle,
+    .laft-syde-content.closed ~ #course_catalog_drag_handle {
+        display: none !important;
+    }
+
+    .laft-syde-content.closed ~ #course_catalog_right_panel {
+        margin-left: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+
+    @media (max-width: 991px) {
+        .course-split-divider {
+            display: none !important;
+        }
+        #course_catalog_left_panel,
+        #course_catalog_right_panel {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 0 !important;
+            position: static !important;
+            flex: 0 0 100% !important;
+        }
+    }
+</style>
 <div class="tab-pane fade {{ request()->query('tab') == 2 || !request()->query('tab') ? 'show active' : '' }}" id="" role="tabpanel" aria-labelledby="v-pills-tab-twos">
     <div class="col-12 col-lg-4 pe-0">
         <div class="py-1 mx-0">
@@ -31,8 +208,8 @@
         <div class="col-12">
             <div class="card card-border shadow-none rounded-0 border-0 p-0">
                 <div class="card-body px-0 py-0 rounded-0 mx-2">
-                    <div class="row mx-0">
-                        <div class="col-12 col-md-12 col-lg-4 bg-white py-2 laft-syde-content">
+                    <div class="row mx-0 position-relative" id="course_catalog_split_container">
+                        <div class="col-12 col-md-12 col-lg-4 bg-white py-2 laft-syde-content" id="course_catalog_left_panel">
                             <div class="d-flex justify-content-between align-items-center pb-2">
                                 <div>
                                     <form id="courseFilterForm" class="forms-sample" method="get" action="{{ url('coursecatalog') }}">
@@ -182,16 +359,22 @@
                                     </form>
                                 </div>
 
-                                <form class="forms-sample"  method="get" action="{{url('coursecatalog')}}">
-                                    <!-- <input type="hidden" name="tab" value="2">
-                                     <input type="text" class="form-control" name="search_name" value="{{Request::get('search_name')}}" placeholder="Search" />
-                                     <div class="input-group-append">
-                                      <span class="input-group-text">
-                                       <button type="submit" class="bi bi-search"></i></button>
-                                       </div>  -->
-                                    <div class="d-flex">
+                                <form class="forms-sample pb-2" method="get" action="{{url('coursecatalog')}}" id="course_search_form">
+                                    <div class="d-flex position-relative">
                                         <input type="hidden" name="tab" value="2">
-                                        <input type="text" class="form-control rounded-0" name="search_name" value="{{Request::get('search_name')}}" placeholder="Search" />
+                                        @if(Request::filled('status'))
+                                            <input type="hidden" name="status" value="{{ Request::get('status') }}">
+                                        @endif
+                                        @if(Request::has('category_id'))
+                                            @foreach((array)Request::get('category_id') as $cat)
+                                                <input type="hidden" name="category_id[]" value="{{ $cat }}">
+                                            @endforeach
+                                        @endif
+                                        <div class="position-relative flex-grow-1">
+                                            <input type="text" class="form-control rounded-0" id="course_search_input" name="search_name" value="{{Request::get('search_name')}}" placeholder="Search" autocomplete="off" />
+                                            <div id="course_search_dropdown" class="course-search-results-dropdown shadow bg-white border rounded-bottom" style="display: none; position: absolute; top: 100%; right: 0; min-width: 380px; z-index: 1050; max-height: 280px; overflow-y: auto;">
+                                            </div>
+                                        </div>
                                         <div class="input-group-append">
                                           <span class="input-group-text" style="height: 40px;">
                                             <button type="submit" class="bi bi-search border-0"></button>
@@ -228,8 +411,8 @@
                                                                 <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" alt="">
                                                             @endif
                                                         </div>
-                                                        <div class="ps-3">
-                                                            <a href="javascript:;" data-dep="{{$courses_list->category_details->department_id}}" data-id="{{$courses_list->id}}" class="pb-1 course-name font-weight-bold user_check">{{$courses_list->course_name??''}} @if($courses_list->active==2) <b>( Draft )</b> @endif</a>
+                                                        <div class="ps-3 flex-grow-1 course-title-container" style="min-width: 0;">
+                                                            <a href="javascript:;" data-dep="{{$courses_list->category_details->department_id}}" data-id="{{$courses_list->id}}" class="pb-1 course-name font-weight-bold user_check" style="display: block !important; height: auto !important; max-height: none !important; white-space: normal !important; word-break: break-word !important; overflow: visible !important; text-overflow: clip !important; -webkit-line-clamp: unset !important; line-clamp: unset !important; -webkit-box-orient: unset !important; line-height: 1.4 !important;">{{$courses_list->course_name??''}} @if($courses_list->active==2) <b>( Draft )</b> @endif</a>
 
                                                             <div class="py-1 sub-categories-styles" >
                                                                 @if($courses_list->course_type==2) Instructor-led training 
@@ -237,7 +420,7 @@
                                                                 Online Training
                                                             @endif</div>
 
-                                                            <div class="py-1 sub-text" >{{$courses_list->assigned_usersdetails_count}} users enrolled</div>
+                                                            <div class="py-1 sub-text">{{ $courses_list->assigned_usersdetails_count ?? ($courses_list->Assigned_usersdetails ? $courses_list->Assigned_usersdetails->count() : 0) }} users enrolled</div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -261,9 +444,16 @@
                                 </div>
 
                             </div>
+
+                            <!-- Draggable Splitter Handle attached to the right edge of this Course List Container -->
+                            <div id="course_catalog_drag_handle" class="course-split-divider" title="Drag to widen course list">
+                                <div class="course-drag-grip">
+                                    <i class="fa-solid fa-grip-lines-vertical"></i>
+                                </div>
+                            </div>
                         </div>
                            
-                        <div class="col-12 col-md-12 col-lg-8 border-left p-0 border-left-15 rite-syde-content position-relative">
+                        <div class="col-12 col-md-12 col-lg-8 border-left p-0 border-left-15 rite-syde-content position-relative" id="course_catalog_right_panel">
                             <div id="loader" style="display:none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; min-height: 400px; background: rgba(255, 255, 255, 0.85); z-index: 1050;" class="align-items-center justify-content-center flex-column">
                                 <img src="{{ url('public/images/loading.gif') }}" class="img-fluid opacity-50" style="max-height: 80px;" alt="Loading...">
                                 <div class="mt-2 text-muted fw-semibold font-smallsize">Loading course details...</div>
@@ -846,5 +1036,322 @@ $('body').on('click', '.search_course_to_user_button', function() {
                 }
             });
         }
+
+        // Draggable handle on course list right border to expand/collapse course list
+        (function() {
+            var $divider = $('#course_catalog_drag_handle');
+            var $left = $('#course_catalog_left_panel');
+            var $right = $('#course_catalog_right_panel');
+            var $container = $('#course_catalog_split_container');
+            var isDragging = false;
+            var startX = 0;
+            var startWidth = 0;
+            var containerWidth = 0;
+
+            function applySplit(newWidthPx) {
+                if (!$container.length) return;
+                containerWidth = $container.width();
+                if (!containerWidth || containerWidth <= 0) return;
+
+                var minLeftPx = 300;
+                var maxLeftPx = Math.min(containerWidth - 300, containerWidth * 0.80);
+                if (maxLeftPx < minLeftPx) {
+                    maxLeftPx = minLeftPx;
+                }
+
+                var clampedWidth = Math.max(minLeftPx, Math.min(newWidthPx, maxLeftPx));
+                var pct = (clampedWidth / containerWidth) * 100;
+                var rightPct = 100 - pct;
+
+                $left.css({
+                    'width': pct + '%',
+                    'max-width': pct + '%'
+                });
+                $right.css({
+                    'margin-left': pct + '%',
+                    'width': rightPct + '%',
+                    'max-width': rightPct + '%',
+                    'flex': '0 0 ' + rightPct + '%'
+                });
+
+                try {
+                    localStorage.setItem('course_catalog_split_pct', pct.toFixed(2));
+                } catch (e) {}
+            }
+
+            // Restore saved width from localStorage if available
+            try {
+                var savedPct = localStorage.getItem('course_catalog_split_pct');
+                if (savedPct) {
+                    var parsed = parseFloat(savedPct);
+                    if (!isNaN(parsed) && parsed >= 20 && parsed <= 80) {
+                        setTimeout(function() {
+                            var cW = $container.width();
+                            if (cW > 0) {
+                                applySplit((parsed / 100) * cW);
+                            }
+                        }, 50);
+                    }
+                }
+            } catch (e) {}
+
+            $divider.on('mousedown touchstart', function(e) {
+                if ($(window).width() < 992) return;
+                if ($left.hasClass('closed')) return;
+
+                isDragging = true;
+                startX = (e.type === 'touchstart') ? e.originalEvent.touches[0].clientX : e.clientX;
+                startWidth = $left.outerWidth();
+                containerWidth = $container.width();
+
+                $('body').addClass('course-split-resizing');
+                $divider.addClass('active');
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            $(document).on('mousemove touchmove', function(e) {
+                if (!isDragging) return;
+
+                var currentX = (e.type === 'touchmove') ? e.originalEvent.touches[0].clientX : e.clientX;
+                var deltaX = currentX - startX;
+                var newWidth = startWidth + deltaX;
+
+                applySplit(newWidth);
+            });
+
+            $(document).on('mouseup touchend', function() {
+                if (!isDragging) return;
+                isDragging = false;
+                $('body').removeClass('course-split-resizing');
+                $divider.removeClass('active');
+                window.dispatchEvent(new Event('resize'));
+            });
+
+            $(window).on('resize', function() {
+                if ($(window).width() >= 992 && !$left.hasClass('closed')) {
+                    containerWidth = $container.width();
+                    var currentLeftW = $left.outerWidth();
+                    if (currentLeftW > 0) {
+                        applySplit(currentLeftW);
+                    }
+                }
+            });
+        })();
+
+        // Live search autocomplete for courses
+        var courseSearchTimer = null;
+        var activeCourseSearchIndex = -1;
+        var activeCourseSearchXhr = null;
+        var isSelectingCourseItem = false;
+
+        function clearAndHideCourseSearchDropdown() {
+            clearTimeout(courseSearchTimer);
+            if (activeCourseSearchXhr) {
+                activeCourseSearchXhr.abort();
+                activeCourseSearchXhr = null;
+            }
+            activeCourseSearchIndex = -1;
+            $('#course_search_dropdown').empty().hide();
+        }
+
+        function performCourseSearch(term) {
+            if (isSelectingCourseItem) {
+                clearAndHideCourseSearchDropdown();
+                return;
+            }
+
+            term = (term || '').trim();
+            var currentVal = ($('#course_search_input').val() || '').trim();
+            if (term.length === 0 || currentVal.length === 0) {
+                clearAndHideCourseSearchDropdown();
+                return;
+            }
+
+            if (activeCourseSearchXhr) {
+                activeCourseSearchXhr.abort();
+                activeCourseSearchXhr = null;
+            }
+
+            var status = $('#statusFilter').val() || $('select[name="status"]').val() || '';
+            var categoryIds = $('#category_id').val() || [];
+
+            activeCourseSearchXhr = $.ajax({
+                url: "{{ url('search_courses_ajax') }}",
+                type: "GET",
+                data: {
+                    term: term,
+                    status: status,
+                    category_id: categoryIds
+                },
+                dataType: "json",
+                success: function(courses) {
+                    if (isSelectingCourseItem) {
+                        clearAndHideCourseSearchDropdown();
+                        return;
+                    }
+
+                    var currentInputVal = ($('#course_search_input').val() || '').trim();
+                    if (!currentInputVal || currentInputVal.length === 0) {
+                        clearAndHideCourseSearchDropdown();
+                        return;
+                    }
+
+                    var $dropdown = $('#course_search_dropdown');
+                    $dropdown.empty();
+                    activeCourseSearchIndex = -1;
+
+                    if (!courses || courses.length === 0) {
+                        $dropdown.html('<div class="px-3 py-2 text-muted text-center" style="font-size: 12px;">No matching courses found</div>').show();
+                        return;
+                    }
+
+                    var html = '';
+                    $.each(courses, function(i, course) {
+                        var badgeText = course.badge ? course.badge : 'Course';
+                        var courseNameEscaped = $('<div>').text(course.name).html();
+                        var badgeEscaped = $('<div>').text(badgeText).html();
+                        var subText = course.course_type + (course.enrolled_count !== undefined ? ' • ' + course.enrolled_count + ' enrolled' : '');
+                        var subTextEscaped = $('<div>').text(subText).html();
+
+                        html += '<div class="course-search-item d-flex align-items-center justify-content-between px-3 py-2" data-id="' + course.id + '" data-name="' + course.name.replace(/"/g, '&quot;') + '" data-dep="' + (course.department_id || '') + '">';
+                        html += '  <div class="d-flex align-items-center text-truncate pe-2">';
+                        html += '    <img src="' + course.image + '" style="width: 38px; height: 28px; object-fit: cover; border-radius: 4px; margin-right: 10px; flex-shrink: 0;" alt="">';
+                        html += '    <div class="text-truncate">';
+                        html += '      <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">' + courseNameEscaped + (course.active == 2 ? ' <span class="badge bg-secondary ms-1" style="font-size:9px;">Draft</span>' : '') + '</div>';
+                        html += '      <div class="text-muted text-truncate" style="font-size: 11px;">' + subTextEscaped + '</div>';
+                        html += '    </div>';
+                        html += '  </div>';
+                        html += '  <div class="ps-2 text-end text-nowrap">';
+                        html += '    <span class="course-badge-dept" title="' + badgeEscaped + '">' + badgeEscaped + '</span>';
+                        html += '  </div>';
+                        html += '</div>';
+                    });
+
+                    if (($('#course_search_input').val() || '').trim().length > 0) {
+                        $dropdown.html(html).show();
+                    } else {
+                        clearAndHideCourseSearchDropdown();
+                    }
+                },
+                error: function(err) {
+                    if (err.statusText !== 'abort') {
+                        console.error('Course search error:', err);
+                    }
+                },
+                complete: function() {
+                    activeCourseSearchXhr = null;
+                }
+            });
+        }
+
+        $('#course_search_input').on('input keyup change search cut paste', function() {
+            if (isSelectingCourseItem) {
+                return;
+            }
+            var term = ($(this).val() || '').trim();
+            if (term.length === 0) {
+                clearAndHideCourseSearchDropdown();
+                return;
+            }
+            clearTimeout(courseSearchTimer);
+            courseSearchTimer = setTimeout(function() {
+                performCourseSearch(term);
+            }, 250);
+        });
+
+        $('#course_search_input').on('focus', function() {
+            if (isSelectingCourseItem) {
+                return;
+            }
+            var term = ($(this).val() || '').trim();
+            if (term.length === 0) {
+                clearAndHideCourseSearchDropdown();
+            } else if ($('#course_search_dropdown').children().length > 0) {
+                $('#course_search_dropdown').show();
+            }
+        });
+
+        // Keyboard navigation (arrows + Enter + Escape)
+        $('#course_search_input').on('keydown', function(e) {
+            var $dropdown = $('#course_search_dropdown');
+            var $items = $dropdown.find('.course-search-item');
+
+            if (!$dropdown.is(':visible') || $items.length === 0) {
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeCourseSearchIndex = (activeCourseSearchIndex + 1) % $items.length;
+                $items.removeClass('active-item');
+                $items.eq(activeCourseSearchIndex).addClass('active-item');
+                $items.eq(activeCourseSearchIndex)[0].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeCourseSearchIndex = (activeCourseSearchIndex - 1 + $items.length) % $items.length;
+                $items.removeClass('active-item');
+                $items.eq(activeCourseSearchIndex).addClass('active-item');
+                $items.eq(activeCourseSearchIndex)[0].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter') {
+                if (activeCourseSearchIndex >= 0 && activeCourseSearchIndex < $items.length) {
+                    e.preventDefault();
+                    $items.eq(activeCourseSearchIndex).trigger('click');
+                }
+            } else if (e.key === 'Escape') {
+                clearAndHideCourseSearchDropdown();
+            }
+        });
+
+        // Prevent mousedown on dropdown items from stealing focus or triggering input events
+        $(document).on('mousedown', '.course-search-item', function(e) {
+            e.preventDefault();
+        });
+
+        // Click on a course search item
+        $(document).on('click', '.course-search-item', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            isSelectingCourseItem = true;
+            clearTimeout(courseSearchTimer);
+            if (activeCourseSearchXhr) {
+                activeCourseSearchXhr.abort();
+                activeCourseSearchXhr = null;
+            }
+
+            var courseId = $(this).data('id');
+            var courseName = $(this).data('name');
+
+            $('#course_search_dropdown').empty().hide();
+            $('#course_search_input').val(courseName).blur();
+
+            setTimeout(function() {
+                isSelectingCourseItem = false;
+            }, 300);
+
+            var $targetRow = $('.user_check[data-id="' + courseId + '"]').first();
+            if ($targetRow.length) {
+                if ($targetRow[0].scrollIntoView) {
+                    $targetRow[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                $targetRow.trigger('click');
+            } else {
+                var form = $('#course_search_form');
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'course_id',
+                    value: courseId
+                }).appendTo(form);
+                form.submit();
+            }
+        });
+
+        // Click outside closes dropdown
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#course_search_form').length) {
+                clearAndHideCourseSearchDropdown();
+            }
+        });
     });
 </script>

@@ -37,6 +37,19 @@ class LoginController extends Controller
 
         $credentials = $request->only('email', 'password');
 
+        $user = User::withTrashed()->where('email', $request->email)->first();
+
+        // Check deleted account.
+        if($user && $user->trashed()){
+            return back()->with('error', 'Your account has been deleted. Please contact your administrator for assistance.');
+        }
+
+        // Check Inactive account.
+        if($user && $user->active === 0){
+            return back()->with('error', 'Your account is inactive. Please contact your administrator for assistance.');
+        }
+        
+
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
             $user->last_login = now();

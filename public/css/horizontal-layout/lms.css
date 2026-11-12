@@ -2149,10 +2149,11 @@ button.multiselect.dropdown-toggle::after{
     text-overflow: ellipsis;
 }
 .user-dep-widt{
-    width: 80px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    width: auto;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    word-break: break-word;
 }
 .course-cat-in-courses{
     display: -webkit-box;

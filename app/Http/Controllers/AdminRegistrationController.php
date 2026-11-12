@@ -583,6 +583,9 @@ $chartData = [
 
      public function admin_users(Request $request)
     {
+        if ($request->ajax() && $request->has('ajax_search')) {
+            return $this->search_users_ajax($request);
+        }
 
         $adminCreatedUserId = session('admin_created_user_id');
         //dd(Auth::user()->roles->permissions->contains('1'));
@@ -593,9 +596,11 @@ $chartData = [
         $users_query->where('department', $request->dept_id);
     }
     
-    // Status Filter using Checkboxes (Active: 1, Inactive: 0, Deactivated: 2)
+    // Status Filter (Supports Single Select dropdown 'user_active' & Multiple Select 'user_status')
     $selectedStatuses = [];
-    if ($request->has('user_status')) {
+    $selectMode = $request->input('select_mode', 'single');
+
+    if ($selectMode === 'multiple' && $request->has('user_status')) {
         $rawStatuses = $request->input('user_status');
         if (is_array($rawStatuses)) {
             $selectedStatuses = array_map('strval', $rawStatuses);
@@ -613,9 +618,19 @@ $chartData = [
         } else {
             $selectedStatuses = [strval($rawActive)];
         }
+        $selectMode = 'single';
+    } elseif ($request->has('user_status')) {
+        $rawStatuses = $request->input('user_status');
+        if (is_array($rawStatuses)) {
+            $selectedStatuses = array_map('strval', $rawStatuses);
+        } elseif (!empty($rawStatuses) || $rawStatuses === '0') {
+            $selectedStatuses = [strval($rawStatuses)];
+        }
+        $selectMode = 'multiple';
     } else {
         // Default: Active users list
         $selectedStatuses = ['1'];
+        $selectMode = 'single';
     }
 
     if (in_array('deactivated', $selectedStatuses, true) && !in_array('2', $selectedStatuses, true)) {
@@ -792,7 +807,95 @@ $chartData = [
 
         $departments = Department::get();
        $designations = Designation::get();
-        return view('admin.users.users',compact('users','edit_user','courses_lists','groups_lists','groups_id','roles_lists','manager1_users','manager2_users','team_leads','departments','designations','category_list','request','training_managers','senior_training_managers','selectedStatuses','statusCounts'));
+        return view('admin.users.users',compact('users','edit_user','courses_lists','groups_lists','groups_id','roles_lists','manager1_users','manager2_users','team_leads','departments','designations','category_list','request','training_managers','senior_training_managers','selectedStatuses','statusCounts','selectMode'));
+    }
+
+    public function search_users_ajax(Request $request)
+    {
+        $term = trim($request->input('term', $request->input('search_name', '')));
+        if ($term === '') {
+            return response()->json([]);
+        }
+
+        $query = User::withTrashed()->with('departmentdetails', 'designationdetails');
+
+        // Apply department filter if selected
+        if ($request->filled('dept_id')) {
+            $query->where('department', $request->dept_id);
+        }
+
+        // Apply designation filter if selected
+        if ($request->filled('desig_id')) {
+            $query->where('designation', $request->desig_id);
+        }
+
+        // Apply status filter if present
+        if ($request->has('user_status')) {
+            $rawStatuses = (array)$request->input('user_status');
+            $hasActive = in_array('1', $rawStatuses, true);
+            $hasInactive = in_array('0', $rawStatuses, true);
+            $hasDeactivated = in_array('2', $rawStatuses, true);
+
+            if ($hasActive && $hasInactive && $hasDeactivated) {
+                // all
+            } elseif ($hasActive || $hasInactive || $hasDeactivated) {
+                $query->where(function ($q) use ($hasActive, $hasInactive, $hasDeactivated) {
+                    $hasCond = false;
+                    if ($hasActive) {
+                        $q->where(function ($sub) {
+                            $sub->whereNull('deleted_at')->whereNull('deactivation_reason')->where('active', 1);
+                        });
+                        $hasCond = true;
+                    }
+                    if ($hasInactive) {
+                        $method = $hasCond ? 'orWhere' : 'where';
+                        $q->$method(function ($sub) {
+                            $sub->whereNull('deleted_at')->whereNull('deactivation_reason')->where(function ($s) {
+                                $s->where('active', 0)->orWhereNull('active');
+                            });
+                        });
+                        $hasCond = true;
+                    }
+                    if ($hasDeactivated) {
+                        $method = $hasCond ? 'orWhere' : 'where';
+                        $q->$method(function ($sub) {
+                            $sub->whereNotNull('deleted_at')->orWhere('active', 2)->orWhereNotNull('deactivation_reason');
+                        });
+                    }
+                });
+            }
+        }
+
+        // Search user by name, username, emp_id, or email
+        $query->where(function ($q) use ($term) {
+            $q->where('first_name', 'like', '%' . $term . '%')
+              ->orWhere('last_name', 'like', '%' . $term . '%')
+              ->orWhere('username', 'like', '%' . $term . '%')
+              ->orWhere('emp_id', 'like', '%' . $term . '%')
+              ->orWhere('email', 'like', '%' . $term . '%')
+              ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ['%' . $term . '%']);
+        });
+
+        $users = $query->limit(20)->get();
+
+        $results = $users->map(function ($u) {
+            $fullName = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+            if ($fullName === '') {
+                $fullName = $u->username ?? $u->email ?? ('User #' . $u->id);
+            }
+            $deptName = $u->departmentdetails->department_name ?? 'No Department';
+
+            return [
+                'id' => $u->id,
+                'name' => $fullName,
+                'email' => $u->email ?? '',
+                'emp_id' => $u->emp_id ?? '',
+                'department' => $deptName,
+                'designation' => $u->designationdetails->designation_name ?? '',
+            ];
+        });
+
+        return response()->json($results);
     }
     public function fetchUserDataApi(Request $request)
     {
@@ -1074,25 +1177,73 @@ $courseNames = $courses->map(function ($course) {
     $userData['course'] = $assignedUserData;
 
 
-    $total_courses =AsignedUser::where('user_id',$user->id)->whereHas('course_details', function($q) use ($request) {
+    $total_courses = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
+        ->whereHas('course_details', function($q) use ($request) {
             $q->where('course_type', 1);
-             })->count();
-    $completed_course = AsignedUser::where('user_id', $user->id)->where('status', 3)->count();
-    $inprogress_count = AsignedUser::where('user_id', $user->id)->whereHas('course_details', function ($q) {
-        $q->where('course_type', 1);
-    })->where('status', 1)->count();
-     $pending_count = AsignedUser::where('user_id', $user->id)
+        })->count();
+
+    $completed_course = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
         ->whereHas('course_details', function ($q) {
             $q->where('course_type', 1);
         })
+        ->where('status', 3)->count();
+
+    $inprogress_count = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
+        ->whereHas('course_details', function ($q) {
+            $q->where('course_type', 1)
+              ->where(function ($expQ) {
+                  $expQ->whereNull('expiration_date')
+                       ->orWhere('expiration_date', '>=', Carbon::now())
+                       ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                       ->orWhere('expiration_date', '=', '1970-01-01');
+              });
+        })->where('status', 1)->count();
+
+    $pending_count = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
+        ->whereHas('course_details', function ($q) {
+            $q->where('course_type', 1)
+              ->where(function ($expQ) {
+                  $expQ->whereNull('expiration_date')
+                       ->orWhere('expiration_date', '>=', Carbon::now())
+                       ->orWhere('expiration_date', '=', '1970-01-01 00:00:00')
+                       ->orWhere('expiration_date', '=', '1970-01-01');
+              });
+        })
         ->where(function ($query) {
             $query->where('status', 0)
-                  ->orWhere('status', 2);
+                  ->orWhere('status', 2)
+                  ->orWhereNull('status');
         })
         ->count();
-    $instructor_lead = AsignedUser::where('user_id', $user->id)->whereHas('course_details', function ($q) {
-        $q->where('course_type', 2);
-    })->count();
+
+    $expired_count = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
+        ->where('status', '!=', 3)
+        ->whereHas('course_details', function ($q) {
+            $q->where('course_type', 1)
+              ->whereNotNull('expiration_date')
+              ->where('expiration_date', '!=', '1970-01-01 00:00:00')
+              ->where('expiration_date', '!=', '1970-01-01')
+              ->where('expiration_date', '<', Carbon::now());
+        })
+        ->count();
+
+    $instructor_lead = AsignedUser::has('course_details')
+        ->where('user_id', $user->id)
+        ->whereHas('course_details', function ($q) {
+            $q->where('course_type', 2);
+        })->count();
+
+    $userData['total_courses'] = $total_courses;
+    $userData['completed_course'] = $completed_course;
+    $userData['inprogress_count'] = $inprogress_count;
+    $userData['pending_count'] = $pending_count;
+    $userData['expired_count'] = $expired_count;
+    $userData['instructor_lead'] = $instructor_lead;
 
     // Generate reports HTML
     $deactivationNoticeHtml = '';
@@ -1163,6 +1314,17 @@ $courseNames = $courses->map(function ($course) {
             <div class="col-12 col-md-6 col-lg-3 my-2">
                 <div class="reports-card reports-card5">
                     <div class="d-flex align-items-center justify-content-start">
+                        <div class="reports-icon reports-icon5"><i class="bi bi-calendar-x text-danger"></i></div>
+                        <div class="ms-3">
+                            <h6>Expired</h6>
+                            <h6 class="text-center mb-0">' . $expired_count . '</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3 my-2">
+                <div class="reports-card reports-card5">
+                    <div class="d-flex align-items-center justify-content-start">
                         <div class="reports-icon reports-icon4"><i class="fa-solid fa-person-chalkboard"></i></div>
                         <div class="ms-3">
                             <h6>Instructor Led</h6>
@@ -1191,7 +1353,9 @@ $courseNames = $courses->map(function ($course) {
         'course_details.assignment_exam.assignment_exam_name',
         'assigned_exam_datas.exam_details'
     ])->whereHas('course_details', function ($q) {
-        $q->where('course_type', 1);
+        $q->where(function($sub) {
+            $sub->where('course_type', '!=', 2)->orWhereNull('course_type');
+        });
     })->where('user_id', $user->id)->get();
 
     $course_html_data = '<div class="table-responsive">
@@ -1363,7 +1527,14 @@ $courseNames = $courses->map(function ($course) {
             if ($canShowCertificate) {
                 $courseStatusBadge = '<span class="badge bg-success px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Completed</span>';
             } else {
-                if ($hasFailedAssessment || $hasFailedAssignment || (int)$data->status === 2) {
+                $isCourseExpired = !empty($data->course_details->expiration_date) 
+                    && $data->course_details->expiration_date !== '1970-01-01 00:00:00' 
+                    && $data->course_details->expiration_date !== '1970-01-01' 
+                    && \Carbon\Carbon::parse($data->course_details->expiration_date)->isPast();
+
+                if ($isCourseExpired) {
+                    $courseStatusBadge = '<span class="badge bg-danger px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;"><i class="bi bi-calendar-x me-1"></i>Expired</span>';
+                } elseif ($hasFailedAssessment || $hasFailedAssignment || (int)$data->status === 2) {
                     $courseStatusBadge = '<span class="badge bg-danger px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Failed</span>';
                 } elseif ($hasAnyAssessmentAttempted || $hasAnyAssignmentAttempted || (int)$data->status === 1) {
                     $courseStatusBadge = '<span class="badge bg-warning text-dark px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">In Progress</span>';
@@ -1819,6 +1990,538 @@ $userData['reports_html'] = $html . '<div>
 $userData['assignment_modals_html'] = $assignment_modals_html;
 
 $userData['activity_html'] = $activity_html_data;
+
+// Build Course Reports HTML (Identical metrics to user-side reports)
+$userAssignedForReports = Asigneduser::with(['course_details.category_details', 'category_details'])
+    ->where('user_id', $user->id)
+    ->has('course_details')
+    ->get();
+
+$overallTotalSeconds = 0;
+$overallAttemptCount = 0;
+$overallPassedCourses = 0;
+$overallScores = [];
+$coursesReportsCardsHtml = '';
+
+foreach ($userAssignedForReports as $idx => $assign) {
+    $cDetails = $assign->course_details;
+    $courseId = $assign->course_id;
+
+    $cDocIds = Course_documents::where('course_id', $courseId)
+        ->where('type', 6)
+        ->where('is_delete', 0)
+        ->pluck('id');
+
+    $cAssessmentResults = Assessment_results::where('user_id', $user->id)
+        ->where(function($q) use ($assign, $cDocIds) {
+            $q->where('assign_id', $assign->id)
+              ->orWhereIn('course_document_id', $cDocIds);
+        })
+        ->whereNull('deleted_at')
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $cExamAttempts = ExamAttempt::where('user_id', $user->id)
+        ->where(function($q) use ($assign, $courseId) {
+            $q->where('assigned_id', $assign->id)
+              ->orWhere('course_id', $courseId);
+        })
+        ->orderBy('id', 'asc')
+        ->get();
+
+    // Dynamically resolved application timezone & parser for timestamps
+    $appTimezone = config('app.timezone') ?: (date_default_timezone_get() ?: 'UTC');
+    $parseTimestamp = function($value) use ($appTimezone) {
+        if (empty($value)) return null;
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->setTimezone($appTimezone);
+        }
+        $str = trim((string)$value);
+        if ($str === '') return null;
+        if (str_ends_with(strtoupper($str), 'Z')) {
+            return Carbon::parse($str)->setTimezone($appTimezone);
+        }
+        return Carbon::parse($str, $appTimezone)->setTimezone($appTimezone);
+    };
+
+    // 1. Learning Time
+    $cSeconds = 0;
+    foreach ($cAssessmentResults as $res) {
+        $sec = 0;
+        if (!empty($res->total_time_taken) && is_numeric($res->total_time_taken)) {
+            $sec = (int)$res->total_time_taken;
+        } elseif (!empty($res->completed_at) && !empty($res->created_at)) {
+            $tComp = $parseTimestamp($res->completed_at);
+            $tCreate = $parseTimestamp($res->created_at);
+            $sec = ($tComp && $tCreate) ? max(0, abs($tComp->timestamp - $tCreate->timestamp)) : 0;
+        }
+        $cSeconds += $sec;
+    }
+    foreach ($cExamAttempts as $att) {
+        if (!empty($att->total_time) && is_numeric($att->total_time)) {
+            $cSeconds += ((int)$att->total_time) * 60;
+        }
+    }
+    $overallTotalSeconds += $cSeconds;
+
+    if ($cSeconds >= 3600) {
+        $hrs = floor($cSeconds / 3600);
+        $mins = floor(($cSeconds % 3600) / 60);
+        $cTotalTimeFormatted = $hrs . ' hr ' . $mins . ' min';
+    } elseif ($cSeconds >= 60) {
+        $mins = floor($cSeconds / 60);
+        $secs = $cSeconds % 60;
+        $cTotalTimeFormatted = $mins . ' min' . ($secs > 0 ? ' ' . $secs . ' sec' : '');
+    } elseif ($cSeconds > 0) {
+        $cTotalTimeFormatted = $cSeconds . ' sec';
+    } else {
+        $cTotalTimeFormatted = '0 min';
+    }
+
+    // First & Last Accessed (Dynamically converted to configured application/database timezone)
+    $cAllDates = [];
+    foreach ($cAssessmentResults as $res) {
+        if ($d1 = $parseTimestamp($res->created_at)) $cAllDates[] = $d1;
+        if ($d2 = $parseTimestamp($res->completed_at)) $cAllDates[] = $d2;
+    }
+    foreach ($cExamAttempts as $att) {
+        if ($d1 = $parseTimestamp($att->created_at)) $cAllDates[] = $d1;
+        $evalDate = $att->evaluation_completed_date ?? $att->updated_at;
+        if ($d2 = $parseTimestamp($evalDate)) $cAllDates[] = $d2;
+    }
+
+    if (!empty($cAllDates)) {
+        usort($cAllDates, function($a, $b) {
+            return $a->timestamp <=> $b->timestamp;
+        });
+        $cFirstAccessed = $cAllDates[0]->format('d M Y, h:i A');
+        $cLastAccessed = end($cAllDates)->format('d M Y, h:i A');
+    } else {
+        $cFirstAccessed = 'Not Yet Accessed';
+        $cLastAccessed = 'Not Yet Accessed';
+    }
+
+    // 2. Attempts & Pass/Fail (Take latest up to 3 valid attempts per course)
+    $rawAttempts = $cAssessmentResults->count() + $cExamAttempts->count();
+    $cAttempts = min(3, $rawAttempts);
+    $overallAttemptCount += $cAttempts;
+
+    // Latest up to 3 attempts
+    $latestAssessmentResults = $cAssessmentResults->count() > 3 ? $cAssessmentResults->slice(-3)->values() : $cAssessmentResults;
+    $latestExamAttempts = $cExamAttempts->count() > 3 ? $cExamAttempts->slice(-3)->values() : $cExamAttempts;
+
+    // Check if course has active assessments (type 6) or active assignments (type 7)
+    $cActiveAssessments = Course_documents::where('course_id', $courseId)
+        ->where('type', 6)
+        ->where('is_delete', 0)
+        ->where(function ($q) {
+            $q->where('is_active', 1)->orWhereNull('is_active');
+        })
+        ->get();
+
+    $cActiveAssignments = Course_documents::where('course_id', $courseId)
+        ->where('type', 7)
+        ->where('is_delete', 0)
+        ->where(function ($q) {
+            $q->where('is_active', 1)->orWhereNull('is_active');
+        })
+        ->get();
+
+    $hasAssess = $cActiveAssessments->isNotEmpty();
+    $hasAssign = $cActiveAssignments->isNotEmpty();
+
+    $cHasPassed = false;
+    if ($hasAssess || $hasAssign) {
+        $allAssessPassed = true;
+        if ($hasAssess) {
+            foreach ($cActiveAssessments as $assess) {
+                $passed = $cAssessmentResults->where('course_document_id', $assess->id)->contains(function($res) {
+                    if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
+                        return true;
+                    }
+                    $payload = json_decode($res->result_data ?? '', true);
+                    $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+                    $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                    return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+                });
+                if (!$passed) {
+                    $allAssessPassed = false;
+                    break;
+                }
+            }
+        }
+
+        $allAssignPassed = true;
+        if ($hasAssign) {
+            $uniqueExamCodes = $cActiveAssignments->pluck('file_path')->filter()->unique();
+            if ($uniqueExamCodes->isEmpty()) {
+                $allAssignPassed = false;
+            } else {
+                foreach ($uniqueExamCodes as $examCode) {
+                    $exam = Exam::where('exam_code', $examCode)->first();
+                    if (!$exam) {
+                        $allAssignPassed = false;
+                        break;
+                    }
+                    $passed = $cExamAttempts->where('exam_id', $exam->id)->contains(function($att) {
+                        return strtolower(trim($att->exam_result ?? '')) === 'passed';
+                    });
+                    if (!$passed) {
+                        $allAssignPassed = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $cHasPassed = ($hasAssess ? $allAssessPassed : true) && ($hasAssign ? $allAssignPassed : true);
+    } else {
+        $cHasPassed = ((int)($assign->status ?? 0) === 3);
+    }
+
+    if ($cHasPassed) {
+        $overallPassedCourses++;
+        $cBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+    } elseif ($cAttempts > 0) {
+        $cBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+    } else {
+        $cBadge = '<span class="report-badge-neutral">Not Attempted</span>';
+    }
+
+    // Scores breakdown from latest up to 3 attempts
+    $cScores = [];
+    foreach ($latestAssessmentResults as $res) {
+        $payload = json_decode($res->result_data ?? '', true);
+        $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+        if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+            $score = round((float)$details['percentage'], 1);
+            $cScores[] = $score;
+            $overallScores[] = $score;
+        }
+    }
+
+    foreach ($latestExamAttempts as $att) {
+        if (isset($att->percentage) && is_numeric($att->percentage)) {
+            $score = round((float)$att->percentage, 1);
+            $cScores[] = $score;
+            $overallScores[] = $score;
+        }
+    }
+
+    // If passed on any attempt, ensure passing score is preserved
+    if ($cHasPassed) {
+        foreach ($cAssessmentResults as $res) {
+            $payload = json_decode($res->result_data ?? '', true);
+            $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+            $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+            if ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'])) {
+                if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                    $pScore = round((float)$details['percentage'], 1);
+                    if (!in_array($pScore, $cScores)) {
+                        $cScores[] = $pScore;
+                        $overallScores[] = $pScore;
+                    }
+                }
+            }
+        }
+    }
+
+    $cHighest = !empty($cScores) ? max($cScores) . '%' : '-';
+    $cLowest = !empty($cScores) ? min($cScores) . '%' : '-';
+
+    // Build per-assessment dropdown options if course has multiple assessments/assignments
+    $cAssessmentOptions = [];
+    $cAssessmentOptionsMap = [];
+
+    foreach ($cActiveAssessments as $assessIdx => $assess) {
+        $aRes = $cAssessmentResults->where('course_document_id', $assess->id);
+        $aCount = min(3, $aRes->count());
+        $aIsPassed = $aRes->contains(function($r) {
+            if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
+            $payload = json_decode($r->result_data ?? '', true);
+            $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+            $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+            return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+        });
+
+        $aScores = [];
+        $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+        foreach ($aLatest as $r) {
+            $payload = json_decode($r->result_data ?? '', true);
+            $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+            if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                $aScores[] = round((float)$details['percentage'], 1);
+            }
+        }
+        if ($aIsPassed) {
+            foreach ($aRes as $r) {
+                $payload = json_decode($r->result_data ?? '', true);
+                $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                    $pScore = round((float)$details['percentage'], 1);
+                    if (!in_array($pScore, $aScores)) $aScores[] = $pScore;
+                }
+            }
+        }
+
+        $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
+        $aKey = 'assess_' . $assess->id;
+        $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($assessIdx + 1));
+
+        $optData = [
+            'key' => $aKey,
+            'name' => $aName,
+            'type' => 'Assessment',
+            'attempts' => $aCount,
+            'status' => $aStatus,
+            'highest_score' => !empty($aScores) ? max($aScores) . '%' : '-',
+            'lowest_score' => !empty($aScores) ? min($aScores) . '%' : '-',
+        ];
+        $cAssessmentOptions[] = $optData;
+        $cAssessmentOptionsMap[$aKey] = $optData;
+    }
+
+    if ($hasAssign) {
+        $uniqueExamCodes = $cActiveAssignments->pluck('file_path')->filter()->unique();
+        foreach ($uniqueExamCodes as $examCode) {
+            $exam = Exam::where('exam_code', $examCode)->first();
+            $examName = $exam && !empty($exam->name) ? $exam->name : $examCode;
+            $examId = $exam ? $exam->id : 0;
+            $eAtts = $cExamAttempts->where('exam_id', $examId);
+            $eCount = min(3, $eAtts->count());
+            $eIsPassed = $eAtts->contains(fn($a) => strtolower(trim($a->exam_result ?? '')) === 'passed');
+
+            $eScores = [];
+            $eLatest = $eAtts->count() > 3 ? $eAtts->slice(-3)->values() : $eAtts;
+            foreach ($eLatest as $a) {
+                if (isset($a->percentage) && is_numeric($a->percentage)) {
+                    $eScores[] = round((float)$a->percentage, 1);
+                }
+            }
+
+            $eStatus = $eIsPassed ? 'Passed' : ($eCount > 0 ? 'Failed' : 'Not Attempted');
+            $eKey = 'exam_' . $examId;
+
+            $optData = [
+                'key' => $eKey,
+                'name' => $examName,
+                'type' => 'Assignment',
+                'attempts' => $eCount,
+                'status' => $eStatus,
+                'highest_score' => !empty($eScores) ? max($eScores) . '%' : '-',
+                'lowest_score' => !empty($eScores) ? min($eScores) . '%' : '-',
+            ];
+            $cAssessmentOptions[] = $optData;
+            $cAssessmentOptionsMap[$eKey] = $optData;
+        }
+    }
+
+    $cFirstAssess = !empty($cAssessmentOptions) ? $cAssessmentOptions[0] : null;
+    $cCardAttempts = $cFirstAssess ? $cFirstAssess['attempts'] : $cAttempts;
+    $cCardStatus = $cFirstAssess ? $cFirstAssess['status'] : ($cHasPassed ? 'Passed' : ($cAttempts > 0 ? 'Failed' : 'Not Attempted'));
+    $cCardHighest = $cFirstAssess ? $cFirstAssess['highest_score'] : $cHighest;
+    $cCardLowest = $cFirstAssess ? $cFirstAssess['lowest_score'] : $cLowest;
+
+    if ($cCardStatus === 'Passed') {
+        $cCardBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+    } elseif ($cCardAttempts > 0) {
+        $cCardBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+    } else {
+        $cCardBadge = '<span class="report-badge-neutral">' . $cCardStatus . '</span>';
+    }
+
+    // Dropdown HTML for multi-assessment courses
+    $cDropdownHtml = '';
+    if (count($cAssessmentOptions) > 1) {
+        $cDropdownHtml .= '<div class="ms-auto" style="min-width: 170px; max-width: 240px;">';
+        $cDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">';
+        foreach ($cAssessmentOptions as $idxOpt => $opt) {
+            $selected = ($idxOpt === 0) ? 'selected' : '';
+            $cDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" ' . $selected . '>' . htmlspecialchars($opt['name']) . '</option>';
+        }
+        $cDropdownHtml .= '</select></div>';
+    }
+
+    $cOptionsJson = htmlspecialchars(json_encode($cAssessmentOptionsMap), ENT_QUOTES, 'UTF-8');
+
+    $courseName = htmlspecialchars($cDetails->course_name ?? 'Course');
+    $catName = htmlspecialchars($assign->category_details->category_name ?? ($cDetails->category_details->category_name ?? 'Category'));
+    $collapseId = 'reportCourseCollapse_' . $assign->id;
+
+    $isFirst = ($idx === 0);
+    $collapseClass = $isFirst ? 'show' : '';
+    $headerCollapsedClass = $isFirst ? '' : 'collapsed';
+    $ariaExpanded = $isFirst ? 'true' : 'false';
+
+    $coursesReportsCardsHtml .= '
+    <div class="card mb-4 border rounded-3 shadow-sm bg-white overflow-hidden" style="border: 1px solid #e2e8f0 !important;">
+        <div class="card-header py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 cursor-pointer ' . $headerCollapsedClass . '" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;" data-bs-toggle="collapse" data-bs-target="#' . $collapseId . '" aria-expanded="' . $ariaExpanded . '" aria-controls="' . $collapseId . '">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 42px; height: 42px; background: rgba(0, 84, 82, 0.1); color: #005452;">
+                    <i class="fa-solid fa-graduation-cap fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1" style="font-size: 1rem;">' . $courseName . '</h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-white text-secondary border px-2 py-1"><i class="fa-regular fa-folder me-1 text-primary"></i>' . $catName . '</span>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                ' . $cBadge . '
+                <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-muted" style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-chevron-down fs-7 chevron-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div id="' . $collapseId . '" class="collapse ' . $collapseClass . '" data-bs-parent="#courseReportsAccordion">
+            <div class="card-body p-4 bg-white">
+                <div class="row g-4">
+                    <!-- Card 1: Total Learning Time -->
+                    <div class="col-12 col-md-6">
+                        <div class="report-stat-card">
+                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
+                                    <i class="fa-solid fa-clock fs-5" style="color: #005452;"></i>
+                                </div>
+                                <div>
+                                    <h6 class="report-card-heading">Total Learning Time</h6>
+                                    <small class="text-muted">Course duration and access records</small>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="report-label mb-1">Total time on course</div>
+                                <div class="report-value-big" style="color: #005452;">' . $cTotalTimeFormatted . '</div>
+                            </div>
+                            <div class="pt-3 border-top">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="report-label"><i class="fa-regular fa-calendar-check text-muted me-1"></i> First Accessed</div>
+                                    <div class="report-value-text">' . $cFirstAccessed . '</div>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="report-label"><i class="fa-regular fa-calendar-days text-muted me-1"></i> Last Accessed</div>
+                                    <div class="report-value-text">' . $cLastAccessed . '</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Assessments -->
+                    <div class="col-12 col-md-6">
+                        <div class="report-stat-card" data-assessment-options=\'' . $cOptionsJson . '\'>
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
+                                        <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="report-card-heading">Assessments</h6>
+                                        <small class="text-muted">Attempts and score summary</small>
+                                    </div>
+                                </div>
+                                ' . $cDropdownHtml . '
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="p-2 rounded bg-light border">
+                                        <div class="report-label mb-1">No. of Attempts</div>
+                                        <div class="report-value-big text-dark report-stat-attempts">' . $cCardAttempts . '</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded bg-light border">
+                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="mt-1 report-stat-badge">' . $cCardBadge . '</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-2 pt-2 border-top">
+                                <div class="col-6">
+                                    <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Highest Score</div>
+                                    <div class="fs-5 fw-bold text-success report-stat-highest">' . $cCardHighest . '</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-down text-danger me-1"></i> Lowest Score</div>
+                                    <div class="fs-5 fw-bold text-secondary report-stat-lowest">' . $cCardLowest . '</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>';
+}
+
+// Overall summary header
+if ($overallTotalSeconds >= 3600) {
+    $hrs = floor($overallTotalSeconds / 3600);
+    $mins = floor(($overallTotalSeconds % 3600) / 60);
+    $overallTotalTimeFormatted = $hrs . ' hr ' . $mins . ' min';
+} elseif ($overallTotalSeconds >= 60) {
+    $mins = floor($overallTotalSeconds / 60);
+    $secs = $overallTotalSeconds % 60;
+    $overallTotalTimeFormatted = $mins . ' min' . ($secs > 0 ? ' ' . $secs . ' sec' : '');
+} elseif ($overallTotalSeconds > 0) {
+    $overallTotalTimeFormatted = $overallTotalSeconds . ' sec';
+} else {
+    $overallTotalTimeFormatted = '0 min';
+}
+
+$overallMaxScore = !empty($overallScores) ? max($overallScores) . '%' : '-';
+$overallMinScore = !empty($overallScores) ? min($overallScores) . '%' : '-';
+
+$courseReportsHtml = '
+<div class="col-12 p-2">
+    <div class="row">
+        <!-- Card 1: Total Learning Time -->
+        <div class="col-12 col-md-4 my-2">
+            <div class="reports-card reports-card1">
+                <div class="d-flex align-items-center justify-content-start">
+                    <div class="reports-icon reports-icon1"><i class="fa-solid fa-clock"></i></div>
+                    <div class="ms-3">
+                        <h6>Total Learning Time</h6>
+                        <h6 class="text-center mb-0">' . $overallTotalTimeFormatted . '</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Card 2: Total No. of Attempts -->
+        <div class="col-12 col-md-4 my-2">
+            <div class="reports-card reports-card2">
+                <div class="d-flex align-items-center justify-content-start">
+                    <div class="reports-icon reports-icon2"><i class="fa-solid fa-file-pen"></i></div>
+                    <div class="ms-3">
+                        <h6>Total No. of Attempts</h6>
+                        <h6 class="text-center mb-0">' . $overallAttemptCount . '</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Card 3: Completed Courses -->
+        <div class="col-12 col-md-4 my-2">
+            <div class="reports-card reports-card3">
+                <div class="d-flex align-items-center justify-content-start">
+                    <div class="reports-icon reports-icon3"><i class="fa-solid fa-user-check"></i></div>
+                    <div class="ms-3">
+                        <h6>Completed Courses</h6>
+                        <h6 class="text-center mb-0">' . $completed_course . '</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 mb-3">
+        <label class="my-2 d-flex align-items-center font-weight-bold"><i class="fa-solid fa-chart-pie headings-icon py-1"></i> Course-wise Detailed Reports</label>
+    </div>' . (empty($coursesReportsCardsHtml) ? '
+    <div class="bg-white p-4 text-center rounded-3 border">
+        <img src="' . url('public/images/no-cer-found-image.jpg') . '" class="img-fluid mx-auto d-block" style="max-height: 120px;" alt="">
+        <div class="text-muted mt-2">No assigned courses or reports found for this user.</div>
+    </div>' : '<div class="accordion course-reports-accordion" id="courseReportsAccordion">' . $coursesReportsCardsHtml . '</div>') . '
+</div>';
+
+$userData['course_reports_html'] = $courseReportsHtml;
 
 return response()->json($userData);
 

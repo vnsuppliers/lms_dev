@@ -586,6 +586,71 @@ public function fetch_course_details(Request $request) {
     $html = view('admin.coursecatalog.course_ajax',compact('course','users_lists','assignedUser','notattend','notresponce','attend','departments','designations','request','completed_course','groups_lists','category_department','roles','reportAssessmentResults'))->render();
     return $html;
 }
+
+public function search_courses_ajax(Request $request)
+{
+    $term = trim($request->input('term', $request->input('search_name', '')));
+    if ($term === '') {
+        return response()->json([]);
+    }
+
+    $query = Courses::with(['category_details.department', 'Assigned_usersdetails'])
+        ->where('is_delete', 0);
+
+    // Filter by active status if specified
+    if ($request->filled('status')) {
+        $query->where('active', $request->status);
+    } else {
+        // By default show active and draft courses
+        $query->whereIn('active', [1, 2]);
+    }
+
+    // Filter by categories if specified
+    if ($request->has('category_id') && !empty($request->input('category_id'))) {
+        $catIds = (array)$request->input('category_id');
+        $query->whereIn('category_id', $catIds);
+    }
+
+    // Search by any letter or number present in course name, course code, category name, or department name
+    $query->where(function ($q) use ($term) {
+        $q->where('course_name', 'like', '%' . $term . '%')
+          ->orWhere('course_code', 'like', '%' . $term . '%')
+          ->orWhereHas('category_details', function ($catQ) use ($term) {
+              $catQ->where('category_name', 'like', '%' . $term . '%')
+                   ->orWhereHas('department', function ($deptQ) use ($term) {
+                       $deptQ->where('department_name', 'like', '%' . $term . '%');
+                   });
+          });
+    });
+
+    $courses = $query->orderBy('course_name', 'asc')->take(20)->get();
+
+    $results = $courses->map(function ($c) {
+        $catName = $c->category_details->category_name ?? '';
+        $deptName = $c->category_details->department->department_name ?? '';
+        $badgeText = $deptName ? $deptName : ($catName ? $catName : 'Course');
+        $enrolledCount = $c->Assigned_usersdetails ? $c->Assigned_usersdetails->count() : 0;
+        $courseType = ($c->course_type == 2) ? 'Instructor-led training' : 'Online Training';
+        $imageUrl = $c->course_image 
+            ? url('storage/app/public/' . $c->course_image) 
+            : url('public/images/course.jpg');
+
+        return [
+            'id' => $c->id,
+            'name' => $c->course_name,
+            'course_type' => $courseType,
+            'enrolled_count' => $enrolledCount,
+            'image' => $imageUrl,
+            'category' => $catName,
+            'department' => $deptName,
+            'badge' => $badgeText,
+            'department_id' => $c->category_details->department_id ?? '',
+            'active' => $c->active,
+        ];
+    });
+
+    return response()->json($results);
+}
 public function add_course_type_details(Request $request)
 {
 

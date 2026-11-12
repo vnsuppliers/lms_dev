@@ -23,6 +23,84 @@
         left: 0px;
         top: -8px;
     }
+    .report-stat-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        padding: 20px;
+        height: 100%;
+        transition: all 0.2s ease;
+    }
+    .report-stat-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+    .report-card-heading {
+        color: #005452;
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0;
+    }
+    .report-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: none;
+        letter-spacing: 0.3px;
+    }
+    .report-value-big {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #1e293b;
+        line-height: 1.2;
+    }
+    .report-value-text {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .report-badge-pass {
+        background-color: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        display: inline-block;
+    }
+    .report-badge-fail {
+        background-color: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        display: inline-block;
+    }
+    .report-badge-neutral {
+        background-color: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        display: inline-block;
+    }
+    /* Course Reports Accordion smooth animation */
+    .course-reports-accordion .collapsing {
+        transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .course-reports-accordion .card-header .chevron-icon {
+        transition: transform 0.35s ease;
+    }
+    .course-reports-accordion .card-header:not(.collapsed) .chevron-icon,
+    .course-reports-accordion .card-header[aria-expanded="true"] .chevron-icon {
+        transform: rotate(180deg);
+    }
 </style>
 @if(isset($request->id))
 <div class="tab-pane card-border border-top-0 fade @if(Request::get('menu')=='1') show active @endif" id="vu" role="tabpanel" aria-labelledby="vu-tab">
@@ -139,20 +217,209 @@
                     <div class="col-12">
                         <div class="card card-border border-top-0 shadow-none rounded-0 pb-2">
                             <div class="card-body px-2 py-0 rounded-0">
-                                <div class="row">
-                                    <div class="col-12 col-md-12 col-lg-4 bg-white py-2 rounded-3 laft-syde-content pr-lg-1">
+                                <div class="row position-relative" id="user_list_split_container">
+                                    <div class="col-12 col-md-12 col-lg-4 bg-white py-2 rounded-3 laft-syde-content pr-lg-1" id="user_list_left_panel" style="overflow: visible !important; max-width: none !important;">
                                         @php
-                                            $activeStatuses = isset($selectedStatuses) ? (array)$selectedStatuses : (Request::has('user_status') ? (array)Request::get('user_status') : (Request::has('user_active') ? (Request::get('user_active') === 'all' ? ['1','0','2'] : [(string)Request::get('user_active')]) : ['1']));
-                                            $isCustomStatus = (count($activeStatuses) !== 1 || !in_array('1', $activeStatuses));
+                                            $activeCount = $statusCounts['1'] ?? 0;
+                                            $inactiveCount = $statusCounts['0'] ?? 0;
+                                            $deactivatedCount = $statusCounts['2'] ?? 0;
+                                            $allCount = $activeCount + $inactiveCount + $deactivatedCount;
+                                            $selectedStatuses = isset($selectedStatuses) ? (array)$selectedStatuses : (Request::has('user_status') ? (array)Request::get('user_status') : (Request::has('user_active') ? (Request::get('user_active') === 'all' ? ['1','0','2'] : [(string)Request::get('user_active')]) : ['1']));
+                                            $isCustomStatus = (count($selectedStatuses) !== 1 || !in_array('1', $selectedStatuses));
                                             $hasAnyFilter = !empty(Request::get('dept_id')) || !empty(Request::get('desig_id')) || !empty(Request::get('search_name')) || $isCustomStatus;
+
+                                            $selectedLabels = [];
+                                            if (in_array('1', $selectedStatuses)) { $selectedLabels[] = "Active Users Only ($activeCount)"; }
+                                            if (in_array('0', $selectedStatuses)) { $selectedLabels[] = "Inactive Users Only ($inactiveCount)"; }
+                                            if (in_array('2', $selectedStatuses)) { $selectedLabels[] = "Deactivated Users Only ($deactivatedCount)"; }
+                                            if (count($selectedStatuses) === 3) {
+                                                $buttonText = "All Users ($allCount)";
+                                            } elseif (count($selectedLabels) > 0) {
+                                                $buttonText = implode(', ', $selectedLabels);
+                                            } else {
+                                                $buttonText = "Select Status";
+                                            }
                                         @endphp
+                                        <style>
+                                            .custom-status-option:hover {
+                                                background-color: #f1f5f9;
+                                            }
+                                            .user-search-item {
+                                                transition: background-color 0.15s ease-in-out;
+                                                border-bottom: 1px solid #f1f5f9;
+                                                cursor: pointer;
+                                            }
+                                            .user-search-item:last-child {
+                                                border-bottom: none;
+                                            }
+                                            .user-search-item:hover,
+                                            .user-search-item.active-item {
+                                                background-color: #f1f8f7;
+                                            }
+                                            .user-search-results-dropdown {
+                                                width: max-content !important;
+                                                min-width: 380px !important;
+                                                max-width: 520px !important;
+                                                right: 0 !important;
+                                                left: auto !important;
+                                                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+                                                border-radius: 6px !important;
+                                                border: 1px solid #cbd5e1 !important;
+                                                background-color: #ffffff !important;
+                                            }
+                                            .user-dept-badge {
+                                                background-color: #e6f4f2;
+                                                color: #005452;
+                                                border: 1px solid #b2dfdb;
+                                                font-size: 11px;
+                                                font-weight: 600;
+                                                padding: 3px 8px;
+                                                border-radius: 4px;
+                                                white-space: nowrap;
+                                                display: inline-block;
+                                                flex-shrink: 0;
+                                            }
+
+                                            /* Show full user name and content cleanly without cutting off with ... */
+                                            .user-full-name-title,
+                                            .user-name-text {
+                                                white-space: normal !important;
+                                                word-break: break-word !important;
+                                                overflow: visible !important;
+                                                text-overflow: clip !important;
+                                                line-height: 1.35 !important;
+                                            }
+
+                                            /* Show full department name without cutting off with 80px or ... */
+                                            .user-dep-widt,
+                                            th.user-dep-widt,
+                                            td .user-dep-widt {
+                                                width: auto !important;
+                                                max-width: none !important;
+                                                overflow: visible !important;
+                                                white-space: normal !important;
+                                                text-overflow: clip !important;
+                                                word-break: break-word !important;
+                                                line-height: 1.35 !important;
+                                            }
+
+                                            /* Left panel styling: allows dragging wide to the right without being capped by col-lg-4 */
+                                            #user_list_left_panel {
+                                                max-width: none !important;
+                                                overflow: visible !important;
+                                                z-index: 10 !important;
+                                            }
+
+                                            /* Draggable Splitter Handle attached to the right edge of the User List */
+                                            .user-split-divider {
+                                                position: absolute;
+                                                top: 0;
+                                                bottom: 0;
+                                                right: -9px;
+                                                width: 18px;
+                                                z-index: 105;
+                                                cursor: col-resize;
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                touch-action: none;
+                                                user-select: none;
+                                                -webkit-user-select: none;
+                                            }
+
+                                            .user-split-divider::before {
+                                                content: '';
+                                                position: absolute;
+                                                top: 0;
+                                                bottom: 0;
+                                                left: 8px;
+                                                width: 2px;
+                                                background-color: #b2dfdb;
+                                                transition: background-color 0.2s ease;
+                                            }
+
+                                            .user-split-divider:hover::before,
+                                            .user-split-divider.active::before {
+                                                background-color: #005452;
+                                            }
+
+                                            .user-drag-grip {
+                                                width: 18px;
+                                                height: 54px;
+                                                background: #005452;
+                                                color: #ffffff;
+                                                border: 1px solid #003e3d;
+                                                border-radius: 9px;
+                                                box-shadow: 0 2px 8px rgba(0, 84, 82, 0.45);
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                cursor: col-resize;
+                                                transition: transform 0.15s ease, background-color 0.15s ease;
+                                                z-index: 2;
+                                            }
+
+                                            .user-drag-grip i {
+                                                font-size: 11px;
+                                                color: #ffffff;
+                                            }
+
+                                            .user-split-divider:hover .user-drag-grip,
+                                            .user-split-divider.active .user-drag-grip {
+                                                background-color: #007a77;
+                                                box-shadow: 0 4px 14px rgba(0, 84, 82, 0.65);
+                                                transform: scale(1.12);
+                                            }
+
+                                            /* While actively dragging */
+                                            body.user-split-resizing {
+                                                cursor: col-resize !important;
+                                                user-select: none !important;
+                                                -webkit-user-select: none !important;
+                                            }
+
+                                            body.user-split-resizing * {
+                                                user-select: none !important;
+                                                -webkit-user-select: none !important;
+                                            }
+
+                                            body.user-split-resizing #user_list_left_panel,
+                                            body.user-split-resizing .rite-syde-content,
+                                            body.user-split-resizing #user_list_drag_handle {
+                                                transition: none !important;
+                                            }
+
+                                            /* Hidden when left panel is closed/collapsed */
+                                            .laft-syde-content.closed #user_list_drag_handle,
+                                            .laft-syde-content.closed ~ #user_list_drag_handle {
+                                                display: none !important;
+                                            }
+
+                                            .laft-syde-content.closed ~ .rite-syde-content {
+                                                margin-left: 0 !important;
+                                                max-width: 100% !important;
+                                                width: 100% !important;
+                                                flex: 0 0 100% !important;
+                                            }
+
+                                            @media (max-width: 991px) {
+                                                .user-split-divider {
+                                                    display: none !important;
+                                                }
+                                                #user_list_left_panel,
+                                                .rite-syde-content {
+                                                    width: 100% !important;
+                                                    max-width: 100% !important;
+                                                    margin-left: 0 !important;
+                                                    position: static !important;
+                                                    flex: 0 0 100% !important;
+                                                }
+                                            }
+                                        </style>
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
                                                 <form class="forms-sample pb-2" id="view_users_form" method="get" action="{{url('users')}}">
                                                     <input type="hidden" name="tab" value="2">
-                                                    @foreach($activeStatuses as $st)
-                                                        <input type="hidden" name="user_status[]" value="{{ $st }}">
-                                                    @endforeach
                                                     @if(Request::filled('search_name'))
                                                     <input type="hidden" name="search_name" value="{{ Request::get('search_name') }}">
                                                     @endif
@@ -163,20 +430,6 @@
                                                     <a href="{{ url('users') }}?tab=2" class="btn sbmt-btn ms-2">Reset</a>@endif
                                                     <ul class="dropdown-menu filterMenu filters-dropdown-menuu p-3 w-96" style="display: none; top: 7%;">
                                                         <div class="form-group row">
-
-
-                                                  <!--         <div class="col-sm-4 auto">
-  
-                                                                    <label>Category:</label><br>
-                                                                    @foreach($category_list as $category)
-                                                                        <div class="form-check form-check-inline">
-                                                                            <input class="form-check-input category_filter" type="checkbox" name="catg_id[]" value="{{$category->id}}" @if(isset($request->catg_id) && in_array($category->id, $request->catg_id)) checked @endif>
-                                                                            <label class="form-check-label">{{$category->category_name}}</label>
-                                                                        </div>
-                                                                    @endforeach
-
-                                                            </div> -->
-
                                                             <div class="col-sm-6">
                                                                 <select class="js-example-basic-single form-select-control dept_filter" name="dept_id">
                                                                    <option value="">Select a Departments</option>
@@ -193,22 +446,49 @@
                                                                     @endforeach
                                                                 </select>
                                                             </div>
+                                                            <div class="col-sm-12 mt-2">
+                                                                <div class="position-relative">
+                                                                    <div class="form-control d-flex justify-content-between align-items-center" id="custom_status_toggle" style="cursor: pointer; background-color: #fff; height: 38px; padding: 6px 12px; font-size: 13px;">
+                                                                        <span id="custom_status_btn_text" class="text-truncate" style="max-width: 90%;">{{ $buttonText }}</span>
+                                                                        <i class="fa-solid fa-chevron-down" style="font-size: 11px; color: #6c757d;"></i>
+                                                                    </div>
+                                                                    <div id="custom_status_menu" class="border rounded bg-white mt-1 p-2 shadow-sm" style="display: none; max-height: 180px; overflow-y: auto;">
+                                                                        <label class="custom-status-option d-flex align-items-center py-1 px-2 mb-1 rounded" style="cursor: pointer; gap: 8px; font-size: 13px;">
+                                                                            <input type="checkbox" id="cb_status_all" {{ count($selectedStatuses) === 3 ? 'checked' : '' }} style="margin: 0; cursor: pointer;">
+                                                                            <span class="fw-bold">All Users ({{ $allCount }})</span>
+                                                                        </label>
+                                                                        <div class="border-top my-1"></div>
+                                                                        <label class="custom-status-option d-flex align-items-center py-1 px-2 mb-1 rounded" style="cursor: pointer; gap: 8px; font-size: 13px;">
+                                                                            <input type="checkbox" class="cb-status-item" name="user_status[]" value="1" data-label="Active Users Only ({{ $activeCount }})" {{ in_array('1', $selectedStatuses) ? 'checked' : '' }} style="margin: 0; cursor: pointer;">
+                                                                            <span>Active Users Only ({{ $activeCount }})</span>
+                                                                        </label>
+                                                                        <label class="custom-status-option d-flex align-items-center py-1 px-2 mb-1 rounded" style="cursor: pointer; gap: 8px; font-size: 13px;">
+                                                                            <input type="checkbox" class="cb-status-item" name="user_status[]" value="0" data-label="Inactive Users Only ({{ $inactiveCount }})" {{ in_array('0', $selectedStatuses) ? 'checked' : '' }} style="margin: 0; cursor: pointer;">
+                                                                            <span>Inactive Users Only ({{ $inactiveCount }})</span>
+                                                                        </label>
+                                                                        <label class="custom-status-option d-flex align-items-center py-1 px-2 mb-0 rounded" style="cursor: pointer; gap: 8px; font-size: 13px;">
+                                                                            <input type="checkbox" class="cb-status-item" name="user_status[]" value="2" data-label="Deactivated Users Only ({{ $deactivatedCount }})" {{ in_array('2', $selectedStatuses) ? 'checked' : '' }} style="margin: 0; cursor: pointer;">
+                                                                            <span>Deactivated Users Only ({{ $deactivatedCount }})</span>
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
                                                             <div class="col-sm-12 mt-3">
                                                                 <div class="text-end">
-                                                                    <button type="button" class="btn cancel-btn mr-2">Cancel</button>
-                                                                  <button type="submit" class="btn sbmt-btn submitBtn">Apply</button>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </ul>
+                                                                    <button type="button" class="btn filterBtn cancel-btn mr-2" id="btn_cancel_view_users">Cancel</button>
+                                                                    <button type="submit" class="btn sbmt-btn submitBtn">Apply</button>
+                                                                </div>
+                                                           </div>
+                                                       </div>
+                                                   </ul>
                                                 </form>
                                             </div>
                                             <div>
-                                                <form class="forms-sample pb-2"  method="get" action="{{url('users')}}">
-                                                    <div class="d-flex">
+                                                <form class="forms-sample pb-2" method="get" action="{{url('users')}}" id="user_search_form">
+                                                    <div class="d-flex position-relative">
                                                         <input type="hidden" name="tab" value="2">
-                                                        @foreach($activeStatuses as $st)
+                                                        @foreach($selectedStatuses as $st)
                                                             <input type="hidden" name="user_status[]" value="{{ $st }}">
                                                         @endforeach
                                                         @if(Request::filled('dept_id'))
@@ -217,161 +497,28 @@
                                                         @if(Request::filled('desig_id'))
                                                         <input type="hidden" name="desig_id" value="{{ Request::get('desig_id') }}">
                                                         @endif
-                                                        <input type="text" class="form-control rounded-0" name="search_name" value="{{Request::get('search_name')}}" placeholder="Search" />
+                                                        <div class="position-relative flex-grow-1">
+                                                            <input type="text" class="form-control rounded-0" id="user_search_input" name="search_name" value="{{Request::get('search_name')}}" placeholder="Search" autocomplete="off" />
+                                                            <div id="user_search_dropdown" class="user-search-results-dropdown shadow bg-white border rounded-bottom" style="display: none; position: absolute; top: 100%; right: 0; min-width: 380px; z-index: 1050; max-height: 280px; overflow-y: auto;">
+                                                            </div>
+                                                        </div>
                                                         <div class="input-group-append">
                                                             <span class="input-group-text" style="height: 40px;">
-                                                                <button type="submit" class="bi bi-search border-0"  ></button>
+                                                                <button type="submit" class="bi bi-search border-0"></button>
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </form>
                                             </div>
                                         </div>
-
-                                        <style>
-                                            .status-filter-card {
-                                                background-color: #f8fafc;
-                                                border: 1px solid #cbd5e1;
-                                                border-radius: 8px;
-                                                padding: 10px 14px;
-                                                margin-bottom: 12px;
-                                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-                                            }
-                                            .status-check-item {
-                                                display: inline-flex;
-                                                align-items: center;
-                                                gap: 7px;
-                                                cursor: pointer;
-                                                user-select: none;
-                                                margin: 0;
-                                                padding: 2px 4px;
-                                                border-radius: 4px;
-                                                transition: background-color 0.15s;
-                                            }
-                                            .status-check-item:hover {
-                                                background-color: #edf2f7;
-                                            }
-                                            .status-check-item span {
-                                                font-size: 13px;
-                                                font-weight: 600;
-                                                line-height: 1;
-                                            }
-                                            .custom-status-checkbox {
-                                                appearance: none;
-                                                -webkit-appearance: none;
-                                                -moz-appearance: none;
-                                                width: 18px;
-                                                height: 18px;
-                                                min-width: 18px;
-                                                border-radius: 4px;
-                                                cursor: pointer;
-                                                display: inline-block;
-                                                margin: 0;
-                                                vertical-align: middle;
-                                                background-color: #ffffff;
-                                                box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
-                                                transition: all 0.15s ease-in-out;
-                                            }
-                                            /* Active (Green) */
-                                            .cb-active {
-                                                border: 2px solid #16a34a !important;
-                                            }
-                                            .cb-active:checked {
-                                                background-color: #16a34a !important;
-                                                border-color: #16a34a !important;
-                                                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
-                                                background-position: center !important;
-                                                background-repeat: no-repeat !important;
-                                                background-size: 13px 13px !important;
-                                            }
-                                            /* Inactive (Amber) */
-                                            .cb-inactive {
-                                                border: 2px solid #d97706 !important;
-                                            }
-                                            .cb-inactive:checked {
-                                                background-color: #d97706 !important;
-                                                border-color: #d97706 !important;
-                                                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
-                                                background-position: center !important;
-                                                background-repeat: no-repeat !important;
-                                                background-size: 13px 13px !important;
-                                            }
-                                            /* Deactivated (Red) */
-                                            .cb-deactivated {
-                                                border: 2px solid #dc2626 !important;
-                                            }
-                                            .cb-deactivated:checked {
-                                                background-color: #dc2626 !important;
-                                                border-color: #dc2626 !important;
-                                                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
-                                                background-position: center !important;
-                                                background-repeat: no-repeat !important;
-                                                background-size: 13px 13px !important;
-                                            }
-                                        </style>
-                                        <div class="status-filter-card">
-                                            <form id="status_checkbox_filter_form" method="get" action="{{ url('users') }}" class="m-0">
-                                                <input type="hidden" name="tab" value="2">
-                                                @if(Request::filled('dept_id'))
-                                                    <input type="hidden" name="dept_id" value="{{ Request::get('dept_id') }}">
-                                                @endif
-                                                @if(Request::filled('desig_id'))
-                                                    <input type="hidden" name="desig_id" value="{{ Request::get('desig_id') }}">
-                                                @endif
-                                                @if(Request::filled('search_name'))
-                                                    <input type="hidden" name="search_name" value="{{ Request::get('search_name') }}">
-                                                @endif
-
-                                                <!-- Row 1: The 3 Checkboxes with clear borders and spacing -->
-                                                <div class="d-flex align-items-center justify-content-between pb-2">
-                                                    <label class="status-check-item" for="cb_active" title="Filter Active users">
-                                                        <input class="custom-status-checkbox cb-active" type="checkbox" name="user_status[]" id="cb_active" value="1" {{ in_array('1', $activeStatuses) ? 'checked' : '' }}>
-                                                        <span class="text-success fw-bold">Active</span>
-                                                    </label>
-                                                    <label class="status-check-item" for="cb_inactive" title="Filter Inactive users">
-                                                        <input class="custom-status-checkbox cb-inactive" type="checkbox" name="user_status[]" id="cb_inactive" value="0" {{ in_array('0', $activeStatuses) ? 'checked' : '' }}>
-                                                        <span class="fw-bold" style="color: #b45309;">Inactive</span>
-                                                    </label>
-                                                    <label class="status-check-item" for="cb_deactivated" title="Filter Deactivated users">
-                                                        <input class="custom-status-checkbox cb-deactivated" type="checkbox" name="user_status[]" id="cb_deactivated" value="2" {{ in_array('2', $activeStatuses) ? 'checked' : '' }}>
-                                                        <span class="text-danger fw-bold">Deactivated</span>
-                                                    </label>
-                                                </div>
-
-                                                <!-- Row 2: Selected Status Counts (left) + Apply and Reset Buttons (right) -->
-                                                <div class="d-flex align-items-center justify-content-between pt-2 border-top flex-wrap" style="gap: 8px;">
-                                                    <div class="d-flex align-items-center flex-wrap" style="gap: 6px;">
-                                                        @if(in_array('1', $activeStatuses))
-                                                            <span class="badge bg-success text-white px-2 py-1" style="font-size: 11px; font-weight: 600;">
-                                                                Active: {{ $statusCounts['1'] ?? 0 }}
-                                                            </span>
-                                                        @endif
-                                                        @if(in_array('0', $activeStatuses))
-                                                            <span class="badge bg-warning text-dark px-2 py-1" style="font-size: 11px; font-weight: 600;">
-                                                                Inactive: {{ $statusCounts['0'] ?? 0 }}
-                                                            </span>
-                                                        @endif
-                                                        @if(in_array('2', $activeStatuses))
-                                                            <span class="badge bg-danger text-white px-2 py-1" style="font-size: 11px; font-weight: 600;">
-                                                                Deactivated: {{ $statusCounts['2'] ?? 0 }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="d-flex align-items-center ms-auto" style="gap: 6px;">
-                                                        <button type="submit" class="btn sbmt-btn py-1 px-3" style="font-size: 12px; font-weight: 600;">Apply</button>
-                                                        <a href="{{ url('users?tab=2') }}" class="btn btn-outline-secondary py-1 px-2" style="font-size: 12px; font-weight: 500;" title="Reset back to Active users default">Reset</a>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        </div>
                                         <div class="height-78vh">
                                             <div class="table-responsive">
                                                 <table class="table">
                                                     <thead>
                                                     <tr>
-                                                        <th style="width: 150px;">User Details</th>
-                                                        <th style="width: 150px;">Designation</th>
-                                                        <th class="user-dep-widt">Department</th> 
+                                                        <th style="min-width: 140px;">User Details</th>
+                                                        <th style="min-width: 120px;">Designation</th>
+                                                        <th style="min-width: 120px;">Department</th> 
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -379,7 +526,7 @@
                                                         @foreach($users as $user)
 
                                                         <tr class="user_check" data-id="{{$user->id}}" style="cursor:pointer;">
-                                                            <td style="width: 150px;">
+                                                            <td style="min-width: 140px;">
                                                                 <div class="d-flex align-items-center">
                                                                     <div class="profile-image-div-sm">
                                                                         <!-- @if($user->profile_image)
@@ -395,22 +542,22 @@
                                                                         <img src="{{ getUserImage($user->first_name,$user->last_name) }}" class="img-fluid" alt="Default Image">
                                                                     @endif
                                                                     </div>
-                                                                    <div class="ms-2">
-                                                                        <div class="py-1 web-text-color font-weight-bold text-truncate d-flex align-items-center" style="max-width: 170px;">
-                                                                            <span class="text-truncate">{{$user->first_name??''}} {{$user->last_name??''}}</span>
+                                                                    <div class="ms-2 flex-grow-1" style="min-width: 0;">
+                                                                        <div class="py-1 web-text-color font-weight-bold d-flex align-items-center flex-wrap user-full-name-title" style="white-space: normal !important; word-break: break-word !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.35 !important;">
+                                                                            <span class="user-name-text">{{$user->first_name??''}} {{$user->last_name??''}}</span>
                                                                             @if((method_exists($user, 'trashed') && $user->trashed()) || $user->active == 2 || !empty($user->deactivation_reason))
                                                                                 <span class="badge bg-danger text-white ms-1" style="font-size: 9px; padding: 2px 4px;">Deactivated</span>
                                                                             @elseif($user->active == 0 || $user->active === null)
                                                                                 <span class="badge bg-warning text-dark ms-1" style="font-size: 9px; padding: 2px 4px;">Inactive</span>
                                                                             @endif
                                                                         </div>
-                                                                        <div class="py-1 sub-categories-styles text-truncate">{{$user->email??''}}</div>
+                                                                        <div class="py-1 sub-categories-styles text-break">{{$user->email??''}}</div>
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td><div class="py-1 text-start">{{$user->designationdetails->designation_name??''}}</div></td>
+                                                            <td><div class="py-1 text-start" style="white-space: normal !important; word-break: break-word !important;">{{$user->designationdetails->designation_name??''}}</div></td>
                                                             <td>
-                                                                <div class="py-1 user-dep-widt">{{$user->departmentdetails->department_name??''}}
+                                                                <div class="py-1 user-dep-widt" style="width: auto !important; max-width: none !important; overflow: visible !important; white-space: normal !important; text-overflow: clip !important; word-break: break-word !important; line-height: 1.35 !important;">{{$user->departmentdetails->department_name??''}}
                                                                 </div>
                                                                 <!-- <div class="py-1">{{$user->last_login ? \Carbon\Carbon::parse($user->last_login)->format('Y-m-d') : ''}}</div> -->
                                                             </td>
@@ -423,6 +570,13 @@
                                                         @endforeach
                                                     </tbody>
                                                 </table>
+                                            </div>
+                                        </div>
+
+                                        <!-- Draggable Splitter Handle attached to the right edge of this User List Container -->
+                                        <div id="user_list_drag_handle" class="user-split-divider" title="Drag to widen user list">
+                                            <div class="user-drag-grip">
+                                                <i class="fa-solid fa-grip-lines-vertical"></i>
                                             </div>
                                         </div>
                                     </div>
@@ -451,8 +605,9 @@
                                                                 @if(hasPermission(7))
                                                                 <button class="nav-link nav-linkk" id="manage-courses-access-tab" data-bs-toggle="tab" data-bs-target="#mca" type="button" role="tab" aria-controls="mca" aria-selected="true">Manage Courses Access</button>
                                                                 @endif
-                                                                <button class="nav-link nav-linkk" id="user-list-reports-tab" data-bs-toggle="tab" data-bs-target="#ul-reports" type="button" role="tab" aria-controls="ul-reports" aria-selected="true">Reports <small>(Assessments & Assignments)</small> </button>
-                                                                <button class="nav-link nav-linkk" id="user-list-activity-tab" data-bs-toggle="tab" data-bs-target="#ul-activity" type="button" role="tab" aria-controls="ul-activity" aria-selected="true">Activity</button>
+                                                                <button class="nav-link nav-linkk" id="user-list-reports-tab" data-bs-toggle="tab" data-bs-target="#ul-reports" type="button" role="tab" aria-controls="ul-reports" aria-selected="true">Assessments & Assignments</button>
+                                                                <button class="nav-link nav-linkk" id="user-list-course-reports-tab" data-bs-toggle="tab" data-bs-target="#ul-course-reports" type="button" role="tab" aria-controls="ul-course-reports" aria-selected="false">Reports</button>
+                                                                <button class="nav-link nav-linkk" id="user-list-activity-tab" data-bs-toggle="tab" data-bs-target="#ul-activity" type="button" role="tab" aria-controls="ul-activity" aria-selected="false">Activity</button>
                                                             </div>
                                                         </nav>
 
@@ -805,6 +960,11 @@
             </div>
             <div class="tab-pane card-border border-top-0 fade" id="ul-reports" role="tabpanel" aria-labelledby="user-list-reports-tab">
                 <div class="row mx-0 user_report_list">
+
+                </div>
+            </div>
+            <div class="tab-pane card-border border-top-0 fade" id="ul-course-reports" role="tabpanel" aria-labelledby="user-list-course-reports-tab">
+                <div class="row mx-0 user_course_reports_list p-2">
 
                 </div>
             </div>
@@ -1165,6 +1325,7 @@
             $('#activity_range_dropdown').val('');
             $('#session_duration_container').hide();
             $('.user_report_list').html('');
+            $('.user_course_reports_list').html('');
             $('#assignmentExamModalsContainer').html('');
             $('.user_assignments_list').html('');
             $('.user_activity_list').html('');
@@ -1260,6 +1421,7 @@
                     $('#user_form').show();
 
                     $('.user_report_list').html(response.reports_html);
+                    $('.user_course_reports_list').html(response.course_reports_html || '');
                     $('#assignmentExamModalsContainer').html(response.assignment_modals_html || '');
                     $('.user_assignments_list').html(response.assignments_html);
                     $('.user_activity_list').html(response.activity_html);
@@ -1543,9 +1705,9 @@
                 if (activeUserSubTab === 'info') {
                     $('#v-pills-user1').addClass('show active');
                     $('#vw').addClass('show active');
-                    $('#manage-courses-access-tab, #user-list-reports-tab, #user-list-activity-tab').removeClass('active');
+                    $('#manage-courses-access-tab, #user-list-reports-tab, #user-list-course-reports-tab, #user-list-activity-tab').removeClass('active');
                     $('#info-tab').addClass('active');
-                    $('#mca, #ul-reports, #ul-activity').removeClass('show active');
+                    $('#mca, #ul-reports, #ul-course-reports, #ul-activity').removeClass('show active');
                     $('#info').addClass('show active');
                 } else if (activeUserSubTab === 'reports' || !activeUserSubTab) {
                     var checkReportInterval = setInterval(function() {
@@ -1558,10 +1720,10 @@
                             $('#vw').addClass('show active');
 
                             // Switch to Reports sub-tab cleanly without affecting other page containers
-                            $('#info-tab, #manage-courses-access-tab, #user-list-activity-tab').removeClass('active');
+                            $('#info-tab, #manage-courses-access-tab, #user-list-course-reports-tab, #user-list-activity-tab').removeClass('active');
                             $reportsTabBtn.addClass('active');
 
-                            $('#info, #mca, #ul-activity').removeClass('show active');
+                            $('#info, #mca, #ul-course-reports, #ul-activity').removeClass('show active');
                             $('#ul-reports').addClass('show active');
 
                             if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
@@ -1902,11 +2064,414 @@
         activatePreset('all');
         $('#filter_from_date').val('');
         $('#filter_to_date').val('');
-    });
 
-    $(document).on('submit', '#status_checkbox_filter_form, #view_users_form', function(e) {
-        if ($(this).find('input[name="user_status[]"]:checked').length === 0) {
-            $(this).find('input[name="user_status[]"][value="1"]').prop('checked', true);
+        // Toggle custom status dropdown
+        $('#custom_status_toggle').on('click', function(e) {
+            e.stopPropagation();
+            $('#custom_status_menu').slideToggle(120);
+        });
+
+        // Prevent clicking inside the menu from toggling it closed
+        $('#custom_status_menu').on('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Update button text and 'All' checkbox state when checkboxes change
+        function updateStatusDropdownText() {
+            var totalItems = $('.cb-status-item').length;
+            var checkedItems = $('.cb-status-item:checked');
+            var checkedCount = checkedItems.length;
+
+            $('#cb_status_all').prop('checked', checkedCount === totalItems);
+
+            if (checkedCount === totalItems) {
+                $('#custom_status_btn_text').text('All Users ({{ $allCount }})');
+            } else if (checkedCount === 0) {
+                $('#custom_status_btn_text').text('Select Status');
+            } else {
+                var labels = [];
+                checkedItems.each(function() {
+                    labels.push($(this).data('label'));
+                });
+                $('#custom_status_btn_text').text(labels.join(', '));
+            }
         }
+
+        // 'All' checkbox change
+        $('#cb_status_all').on('change', function() {
+            var isChecked = $(this).is(':checked');
+            $('.cb-status-item').prop('checked', isChecked);
+            updateStatusDropdownText();
+        });
+
+        // Individual checkbox change
+        $('.cb-status-item').on('change', function() {
+            updateStatusDropdownText();
+        });
+
+        // Close filters dropdown on Cancel button click
+        $(document).on('click', '#btn_cancel_view_users, #view_users_form .cancel-btn', function(e) {
+            e.preventDefault();
+            $('#view_users_form .filterMenu').hide();
+            $('#custom_status_menu').hide();
+        });
+
+        // Ensure at least one status is selected on submit
+        $('#view_users_form').on('submit', function() {
+            if ($('.cb-status-item:checked').length === 0) {
+                $('.cb-status-item[value="1"]').prop('checked', true);
+            }
+        });
+
+        // Live search autocomplete for users
+        var userSearchTimer = null;
+        var activeSearchIndex = -1;
+        var activeSearchXhr = null;
+        var isSelectingUserItem = false;
+
+        function clearAndHideSearchDropdown() {
+            clearTimeout(userSearchTimer);
+            if (activeSearchXhr) {
+                activeSearchXhr.abort();
+                activeSearchXhr = null;
+            }
+            activeSearchIndex = -1;
+            $('#user_search_dropdown').empty().hide();
+        }
+
+        function performUserSearch(term) {
+            if (isSelectingUserItem) {
+                clearAndHideSearchDropdown();
+                return;
+            }
+
+            term = (term || '').trim();
+            var currentVal = ($('#user_search_input').val() || '').trim();
+            if (term.length === 0 || currentVal.length === 0) {
+                clearAndHideSearchDropdown();
+                return;
+            }
+
+            if (activeSearchXhr) {
+                activeSearchXhr.abort();
+                activeSearchXhr = null;
+            }
+
+            var statuses = [];
+            $('.cb-status-item:checked').each(function() {
+                statuses.push($(this).val());
+            });
+            var deptId = $('select[name="dept_id"]').val() || '';
+            var desigId = $('select[name="desig_id"]').val() || '';
+
+            activeSearchXhr = $.ajax({
+                url: "{{ url('search_users_ajax') }}",
+                type: "GET",
+                data: {
+                    term: term,
+                    user_status: statuses,
+                    dept_id: deptId,
+                    desig_id: desigId
+                },
+                dataType: "json",
+                success: function(users) {
+                    if (isSelectingUserItem) {
+                        clearAndHideSearchDropdown();
+                        return;
+                    }
+
+                    var currentInputVal = ($('#user_search_input').val() || '').trim();
+                    if (!currentInputVal || currentInputVal.length === 0) {
+                        clearAndHideSearchDropdown();
+                        return;
+                    }
+
+                    var $dropdown = $('#user_search_dropdown');
+                    $dropdown.empty();
+                    activeSearchIndex = -1;
+
+                    if (!users || users.length === 0) {
+                        $dropdown.html('<div class="px-3 py-2 text-muted text-center" style="font-size: 12px;">No matching users found</div>').show();
+                        return;
+                    }
+
+                    var html = '';
+                    $.each(users, function(i, user) {
+                        var deptText = user.department ? user.department : 'No Department';
+                        var userEscapedName = $('<div>').text(user.name).html();
+                        var deptEscaped = $('<div>').text(deptText).html();
+                        var subText = user.email || user.emp_id || '';
+                        var subTextEscaped = $('<div>').text(subText).html();
+
+                        html += '<div class="user-search-item d-flex align-items-center justify-content-between px-3 py-2" data-id="' + user.id + '" data-name="' + user.name.replace(/"/g, '&quot;') + '">';
+                        html += '  <div class="d-flex align-items-center text-truncate pe-2">';
+                        html += '    <i class="fa-solid fa-user me-2 text-muted" style="font-size: 13px;"></i>';
+                        html += '    <div class="text-truncate">';
+                        html += '      <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">' + userEscapedName + '</div>';
+                        if (subText) {
+                            html += '      <div class="text-muted text-truncate" style="font-size: 11px;">' + subTextEscaped + '</div>';
+                        }
+                        html += '    </div>';
+                        html += '  </div>';
+                        html += '  <div class="ps-2 text-end text-nowrap">';
+                        html += '    <span class="user-dept-badge" title="' + deptEscaped + '">' + deptEscaped + '</span>';
+                        html += '  </div>';
+                        html += '</div>';
+                    });
+
+                    if (($('#user_search_input').val() || '').trim().length > 0) {
+                        $dropdown.html(html).show();
+                    } else {
+                        clearAndHideSearchDropdown();
+                    }
+                },
+                error: function(err) {
+                    if (err.statusText !== 'abort') {
+                        console.error('User search error:', err);
+                    }
+                },
+                complete: function() {
+                    activeSearchXhr = null;
+                }
+            });
+        }
+
+        $('#user_search_input').on('input keyup change search cut paste', function() {
+            if (isSelectingUserItem) {
+                return;
+            }
+            var term = ($(this).val() || '').trim();
+            if (term.length === 0) {
+                clearAndHideSearchDropdown();
+                return;
+            }
+            clearTimeout(userSearchTimer);
+            userSearchTimer = setTimeout(function() {
+                performUserSearch(term);
+            }, 250);
+        });
+
+        $('#user_search_input').on('focus', function() {
+            if (isSelectingUserItem) {
+                return;
+            }
+            var term = ($(this).val() || '').trim();
+            if (term.length === 0) {
+                clearAndHideSearchDropdown();
+            } else if ($('#user_search_dropdown').children().length > 0) {
+                $('#user_search_dropdown').show();
+            }
+        });
+
+        // Keyboard navigation (arrows + Enter + Escape)
+        $('#user_search_input').on('keydown', function(e) {
+            var $dropdown = $('#user_search_dropdown');
+            var $items = $dropdown.find('.user-search-item');
+
+            if (!$dropdown.is(':visible') || $items.length === 0) {
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeSearchIndex = (activeSearchIndex + 1) % $items.length;
+                $items.removeClass('active-item');
+                $items.eq(activeSearchIndex).addClass('active-item');
+                $items.eq(activeSearchIndex)[0].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeSearchIndex = (activeSearchIndex - 1 + $items.length) % $items.length;
+                $items.removeClass('active-item');
+                $items.eq(activeSearchIndex).addClass('active-item');
+                $items.eq(activeSearchIndex)[0].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter') {
+                if (activeSearchIndex >= 0 && activeSearchIndex < $items.length) {
+                    e.preventDefault();
+                    $items.eq(activeSearchIndex).trigger('click');
+                }
+            } else if (e.key === 'Escape') {
+                clearAndHideSearchDropdown();
+            }
+        });
+
+        // Prevent mousedown on dropdown items from stealing focus or triggering input events
+        $(document).on('mousedown', '.user-search-item', function(e) {
+            e.preventDefault();
+        });
+
+        // Click on a search item
+        $(document).on('click', '.user-search-item', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            isSelectingUserItem = true;
+            clearTimeout(userSearchTimer);
+            if (activeSearchXhr) {
+                activeSearchXhr.abort();
+                activeSearchXhr = null;
+            }
+
+            var userId = $(this).data('id');
+            var userName = $(this).data('name');
+
+            $('#user_search_dropdown').empty().hide();
+            $('#user_search_input').val(userName).blur();
+
+            setTimeout(function() {
+                isSelectingUserItem = false;
+            }, 300);
+
+            var $targetRow = $('.user_check[data-id="' + userId + '"]').first();
+            if ($targetRow.length) {
+                if ($targetRow[0].scrollIntoView) {
+                    $targetRow[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                $targetRow.trigger('click');
+            } else {
+                var form = $('#user_search_form');
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'userId',
+                    value: userId
+                }).appendTo(form);
+                form.submit();
+            }
+        });
+
+        // Click outside closes dropdown
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#user_search_form').length) {
+                clearAndHideSearchDropdown();
+            }
+        });
+
+        // Draggable handle on user list right border to expand/collapse user list
+        (function() {
+            var $divider = $('#user_list_drag_handle');
+            var $left = $('#user_list_left_panel');
+            var $right = $('.rite-syde-content');
+            var $container = $('#user_list_split_container');
+            var isDragging = false;
+            var startX = 0;
+            var startWidth = 0;
+            var containerWidth = 0;
+
+            function applySplit(newWidthPx) {
+                if (!$container.length) return;
+                containerWidth = $container.width();
+                if (!containerWidth || containerWidth <= 0) return;
+
+                var minLeftPx = 300;
+                var maxLeftPx = Math.min(containerWidth - 300, containerWidth * 0.80);
+                if (maxLeftPx < minLeftPx) {
+                    maxLeftPx = minLeftPx;
+                }
+
+                var clampedWidth = Math.max(minLeftPx, Math.min(newWidthPx, maxLeftPx));
+                var pct = (clampedWidth / containerWidth) * 100;
+                var rightPct = 100 - pct;
+
+                $left.css({
+                    'width': pct + '%',
+                    'max-width': pct + '%'
+                });
+                $right.css({
+                    'margin-left': pct + '%',
+                    'width': rightPct + '%',
+                    'max-width': rightPct + '%',
+                    'flex': '0 0 ' + rightPct + '%'
+                });
+
+                try {
+                    localStorage.setItem('user_list_split_pct', pct.toFixed(2));
+                } catch (e) {}
+            }
+
+            // Restore saved width from localStorage if available
+            try {
+                var savedPct = localStorage.getItem('user_list_split_pct');
+                if (savedPct) {
+                    var parsed = parseFloat(savedPct);
+                    if (!isNaN(parsed) && parsed >= 20 && parsed <= 80) {
+                        setTimeout(function() {
+                            var cW = $container.width();
+                            if (cW > 0) {
+                                applySplit((parsed / 100) * cW);
+                            }
+                        }, 50);
+                    }
+                }
+            } catch (e) {}
+
+            $divider.on('mousedown touchstart', function(e) {
+                if ($(window).width() < 992) return;
+                if ($left.hasClass('closed')) return;
+
+                isDragging = true;
+                startX = (e.type === 'touchstart') ? e.originalEvent.touches[0].clientX : e.clientX;
+                startWidth = $left.outerWidth();
+                containerWidth = $container.width();
+
+                $('body').addClass('user-split-resizing');
+                $divider.addClass('active');
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            $(document).on('mousemove touchmove', function(e) {
+                if (!isDragging) return;
+
+                var currentX = (e.type === 'touchmove') ? e.originalEvent.touches[0].clientX : e.clientX;
+                var deltaX = currentX - startX;
+                var newWidth = startWidth + deltaX;
+
+                applySplit(newWidth);
+            });
+
+            $(document).on('mouseup touchend', function() {
+                if (!isDragging) return;
+                isDragging = false;
+                $('body').removeClass('user-split-resizing');
+                $divider.removeClass('active');
+                window.dispatchEvent(new Event('resize'));
+            });
+
+            $(window).on('resize', function() {
+                if ($(window).width() >= 992 && !$left.hasClass('closed')) {
+                    containerWidth = $container.width();
+                    var currentLeftW = $left.outerWidth();
+                    if (currentLeftW > 0) {
+                        applySplit(currentLeftW);
+                    }
+                }
+            });
+        })();
+
+        $(document).on('change', '.report-assessment-select', function(e) {
+            e.stopPropagation();
+            var card = $(this).closest('.report-stat-card');
+            var optionsMap = card.data('assessment-options');
+            if (typeof optionsMap === 'string') {
+                try { optionsMap = JSON.parse(optionsMap); } catch (err) {}
+            }
+            var selectedKey = $(this).val();
+            var data = optionsMap ? optionsMap[selectedKey] : null;
+            if (!data) return;
+
+            card.find('.report-stat-attempts').text(data.attempts);
+
+            var badgeHtml = '';
+            if (data.status === 'Passed') {
+                badgeHtml = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+            } else if (data.status === 'Failed') {
+                badgeHtml = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+            } else {
+                badgeHtml = '<span class="report-badge-neutral">' + (data.status || 'Not Attempted') + '</span>';
+            }
+            card.find('.report-stat-badge').html(badgeHtml);
+
+            card.find('.report-stat-highest').text(data.highest_score);
+            card.find('.report-stat-lowest').text(data.lowest_score);
+        });
     });
 </script>

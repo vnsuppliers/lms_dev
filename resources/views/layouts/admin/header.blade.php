@@ -354,7 +354,7 @@
                                                                 </div>
                                                                 <div class="col-8 col-md-10 col-lg-10p5">
                                                                     <div>
-                                                                        Users <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
+                                                                        User <i class="fa-solid fa-chevron-right ps-1 fs10"></i>
                                                                     </div>
                                                                     <p>
                                                                         View users, create users, assign users to courses and more..
@@ -576,7 +576,7 @@
                                                                 </div>
                                                                 <div class="col-8 col-md-10 col-lg-10p5">
                                                                     <div>
-                                                                        Users
+                                                                        User
                                                                     </div>
                                                                     <p class="mb-0">
                                                                        Login as user.

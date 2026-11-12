@@ -559,28 +559,39 @@
 
                     <!-- Heading 2: Assessments -->
                     <div class="col-12 col-md-6">
-                        <div class="report-stat-card">
-                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
-                                    <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                        <div class="report-stat-card" data-assessment-options='@json($reportData['assessment_options_map'] ?? [])'>
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
+                                        <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="report-card-heading">Assessments</h6>
+                                        <small class="text-muted">Attempts and score summary</small>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h6 class="report-card-heading">Assessments</h6>
-                                    <small class="text-muted">Attempts and score summary</small>
-                                </div>
+                                @if(!empty($reportData['has_multiple_assessments']))
+                                    <div class="ms-auto" style="min-width: 170px; max-width: 240px;">
+                                        <select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">
+                                            @foreach(($reportData['assessment_options'] ?? []) as $index => $opt)
+                                                <option value="{{ $opt['key'] }}" {{ $index === 0 ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
                                         <div class="report-label mb-1">No. of Attempts</div>
-                                        <div class="report-value-big text-dark">{{ $reportData['attempt_count'] ?? 0 }}</div>
+                                        <div class="report-value-big text-dark report-stat-attempts">{{ $reportData['attempt_count'] ?? 0 }}</div>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
                                         <div class="report-label mb-1">Passed In</div>
-                                        <div class="mt-1">
+                                        <div class="mt-1 report-stat-badge">
                                             @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
                                             @elseif(($reportData['passed_in'] ?? '') === 'Failed')
@@ -596,11 +607,11 @@
                             <div class="row g-2 pt-2 border-top">
                                 <div class="col-6">
                                     <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Highest Score</div>
-                                    <div class="fs-5 fw-bold text-success">{{ $reportData['highest_score'] ?? '-' }}</div>
+                                    <div class="fs-5 fw-bold text-success report-stat-highest">{{ $reportData['highest_score'] ?? '-' }}</div>
                                 </div>
                                 <div class="col-6">
                                     <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-down text-danger me-1"></i> Lowest Score</div>
-                                    <div class="fs-5 fw-bold text-secondary">{{ $reportData['lowest_score'] ?? '-' }}</div>
+                                    <div class="fs-5 fw-bold text-secondary report-stat-lowest">{{ $reportData['lowest_score'] ?? '-' }}</div>
                                 </div>
                             </div>
                         </div>
@@ -742,28 +753,39 @@
 
                     <!-- Heading 2: Assessments -->
                     <div class="col-12 col-md-6">
-                        <div class="report-stat-card">
-                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
-                                    <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                        <div class="report-stat-card" data-assessment-options='@json($reportData['assessment_options_map'] ?? [])'>
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
+                                        <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="report-card-heading">Assessments</h6>
+                                        <small class="text-muted">Attempts and score summary</small>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h6 class="report-card-heading">Assessments</h6>
-                                    <small class="text-muted">Attempts and score summary</small>
-                                </div>
+                                @if(!empty($reportData['has_multiple_assessments']))
+                                    <div class="ms-auto" style="min-width: 170px; max-width: 240px;">
+                                        <select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">
+                                            @foreach(($reportData['assessment_options'] ?? []) as $index => $opt)
+                                                <option value="{{ $opt['key'] }}" {{ $index === 0 ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
                                         <div class="report-label mb-1">No. of Attempts</div>
-                                        <div class="report-value-big text-dark">{{ $reportData['attempt_count'] ?? 0 }}</div>
+                                        <div class="report-value-big text-dark report-stat-attempts">{{ $reportData['attempt_count'] ?? 0 }}</div>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
                                         <div class="report-label mb-1">Passed In</div>
-                                        <div class="mt-1">
+                                        <div class="mt-1 report-stat-badge">
                                             @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
                                             @elseif(($reportData['passed_in'] ?? '') === 'Failed')
@@ -779,11 +801,11 @@
                             <div class="row g-2 pt-2 border-top">
                                 <div class="col-6">
                                     <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Highest Score</div>
-                                    <div class="fs-5 fw-bold text-success">{{ $reportData['highest_score'] ?? '-' }}</div>
+                                    <div class="fs-5 fw-bold text-success report-stat-highest">{{ $reportData['highest_score'] ?? '-' }}</div>
                                 </div>
                                 <div class="col-6">
                                     <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-down text-danger me-1"></i> Lowest Score</div>
-                                    <div class="fs-5 fw-bold text-secondary">{{ $reportData['lowest_score'] ?? '-' }}</div>
+                                    <div class="fs-5 fw-bold text-secondary report-stat-lowest">{{ $reportData['lowest_score'] ?? '-' }}</div>
                                 </div>
                             </div>
                         </div>
@@ -1094,6 +1116,32 @@
                 window.location.href = link;
             }
         }
+    });
+
+    $(document).on('change', '.report-assessment-select', function() {
+        var card = $(this).closest('.report-stat-card');
+        var optionsMap = card.data('assessment-options');
+        if (typeof optionsMap === 'string') {
+            try { optionsMap = JSON.parse(optionsMap); } catch (e) {}
+        }
+        var selectedKey = $(this).val();
+        var data = optionsMap ? optionsMap[selectedKey] : null;
+        if (!data) return;
+
+        card.find('.report-stat-attempts').text(data.attempts);
+
+        var badgeHtml = '';
+        if (data.status === 'Passed') {
+            badgeHtml = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+        } else if (data.status === 'Failed') {
+            badgeHtml = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+        } else {
+            badgeHtml = '<span class="report-badge-neutral">' + (data.status || 'Not Attempted') + '</span>';
+        }
+        card.find('.report-stat-badge').html(badgeHtml);
+
+        card.find('.report-stat-highest').text(data.highest_score);
+        card.find('.report-stat-lowest').text(data.lowest_score);
     });
 
 </script>
