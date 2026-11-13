@@ -1,89 +1,309 @@
 @include('layouts.admin.header')
 
-<div class="container-fluid py-3">
-    <!-- Header & Action Bar -->
-    <div class="row mb-3 align-items-center">
-        <div class="col-md-7">
-            <div class="d-flex align-items-center mb-1">
-                <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-secondary me-2" title="Back to Reports">
+<style>
+    /* Modern SaaS Report Execution Theme */
+    .report-run-page {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .modern-header-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+        margin-bottom: 20px;
+    }
+    .btn-back-square {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #475569;
+        font-size: 15px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .btn-back-square:hover {
+        background: #0f766e;
+        color: #ffffff;
+        border-color: #0f766e;
+        transform: translateX(-2px);
+    }
+    .report-title-main {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.3px;
+        margin-bottom: 2px;
+    }
+    .report-subtitle {
+        color: #64748b;
+        font-size: 13px;
+        margin-bottom: 0;
+    }
+    .badge-status-pill {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.2px;
+    }
+    .btn-action-edit {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 18px;
+        border-radius: 8px 0 0 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .btn-action-edit:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+    .btn-action-export {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: 1px solid #059669;
+        color: #ffffff !important;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 20px;
+        border-radius: 0 8px 8px 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+        transition: all 0.2s ease;
+    }
+    .btn-action-export:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+    }
+
+    /* Modern Quick Stats Strip */
+    .modern-stats-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid #f1f5f9;
+    }
+    @media (max-width: 768px) {
+        .modern-stats-strip {
+            grid-template-columns: 1fr;
+        }
+    }
+    .stat-pill-box {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+    }
+    .stat-pill-box:hover {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+    }
+    .stat-icon-wrapper {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    .stat-icon-source {
+        background: #ecfdf5;
+        color: #059669;
+    }
+    .stat-icon-records {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+    .stat-icon-date {
+        background: #fef3c7;
+        color: #d97706;
+    }
+    .stat-label-text {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #64748b;
+        margin-bottom: 2px;
+    }
+    .stat-val-text {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0;
+        line-height: 1.2;
+    }
+
+    /* Modern Table Container Card */
+    .modern-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+        overflow: hidden;
+    }
+    .modern-table-header {
+        background: #ffffff;
+        padding: 16px 22px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .table-title-text {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 0;
+    }
+    .badge-rows-count {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+</style>
+
+<div class="container-fluid py-3 report-run-page">
+    <!-- Modern Header & Action Card -->
+    <div class="modern-header-card">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ route('admin.reports.index') }}" class="btn-back-square" title="Back to Reports">
                     <i class="fa-solid fa-arrow-left"></i>
                 </a>
-                <h4 class="mb-0 text-dark fw-bold">{{ $report->name }}</h4>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="report-title-main">{{ $report->name }}</h4>
+                        <span class="badge-status-pill"><i class="fa-solid fa-circle-check me-1"></i> Executed</span>
+                    </div>
+                    @if($report->description)
+                        <p class="report-subtitle">{{ $report->description }}</p>
+                    @else
+                        <p class="report-subtitle">Report executed successfully. View rows below or export to file.</p>
+                    @endif
+                </div>
             </div>
-            @if($report->description)
-                <p class="text-muted mb-0 font-smallsize ms-4">{{ $report->description }}</p>
-            @endif
-        </div>
-        <div class="col-md-5 text-md-end mt-2 mt-md-0">
-            <div class="btn-group">
-                <a href="{{ route('admin.reports.edit', $report->id) }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="fa-solid fa-pen-to-square me-1"></i> Edit Configuration
-                </a>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-sm btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fa-solid fa-download me-1"></i> Export Report
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end font-smallsize">
-                        <li>
-                            <a class="dropdown-item" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'csv']) }}">
-                                <i class="fa-solid fa-file-csv text-success me-2"></i> Export as CSV
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'excel']) }}">
-                                <i class="fa-solid fa-file-excel text-success me-2"></i> Export as Excel (.xls)
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'pdf']) }}">
-                                <i class="fa-solid fa-file-pdf text-danger me-2"></i> Export as PDF
-                            </a>
-                        </li>
-                    </ul>
+            <div class="d-flex align-items-center gap-0 ms-auto">
+                <div class="btn-group shadow-sm" role="group">
+                    <a href="{{ route('admin.reports.edit', $report->id) }}" class="btn-action-edit">
+                        <i class="fa-solid fa-pen-to-square text-teal" style="color: #0f766e;"></i> Edit Configuration
+                    </a>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn-action-export dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa-solid fa-download me-1"></i> Export Report
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border py-2" style="border-radius: 10px;">
+                            <li>
+                                <a class="dropdown-item py-2 px-3 font-smallsize" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'csv']) }}">
+                                    <i class="fa-solid fa-file-csv text-success me-2"></i> Export as CSV (.csv)
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 px-3 font-smallsize" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'excel']) }}">
+                                    <i class="fa-solid fa-file-excel text-success me-2"></i> Export as Excel (.xls)
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 px-3 font-smallsize" href="{{ route('admin.reports.export', ['report' => $report->id, 'format' => 'pdf']) }}">
+                                    <i class="fa-solid fa-file-pdf text-danger me-2"></i> Export as PDF (.pdf)
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Report Metadata Summary Cards -->
-    <div class="row mb-3">
-        <div class="col-sm-4 mb-2">
-            <div class="card card-border shadow-none border py-2 px-3">
-                <small class="text-muted">Data Source</small>
-                @php
-                    $runSources = is_array($config['data_sources'] ?? null) 
-                        ? $config['data_sources'] 
-                        : (str_contains($report->data_source ?? '', ',') ? array_filter(array_map('trim', explode(',', $report->data_source))) : [$report->data_source]);
-                @endphp
-                @if(count($runSources) > 1)
-                    <div class="fw-bold text-dark text-capitalize mt-1">
-                        <span class="badge text-white me-1" style="background-color: #008080;"><i class="fa-solid fa-layer-group me-1"></i> Multi-Source ({{ count($runSources) }})</span>
-                        <span class="font-smallsize text-muted">({{ implode(' + ', array_map(function($s) { return ucfirst(str_replace('_', ' ', $s)); }, $runSources)) }})</span>
+        <!-- Integrated Modern Stats Strip -->
+        <div class="modern-stats-strip">
+            <!-- Data Source -->
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-source">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Data Source</div>
+                    <div class="stat-val-text text-capitalize">
+                        @php
+                            $runSources = is_array($config['data_sources'] ?? null) 
+                                ? $config['data_sources'] 
+                                : (str_contains($report->data_source ?? '', ',') ? array_filter(array_map('trim', explode(',', $report->data_source))) : [$report->data_source]);
+                        @endphp
+                        @if(count($runSources) > 1)
+                            Multi-Source ({{ count($runSources) }})
+                        @else
+                            {{ ucfirst(str_replace('_', ' ', $report->data_source)) }}
+                        @endif
                     </div>
-                @else
-                    <div class="fw-bold text-dark text-capitalize"><i class="fa-solid fa-database text-teal me-1" style="color: #008080;"></i> {{ str_replace('_', ' ', $report->data_source) }}</div>
-                @endif
+                </div>
             </div>
-        </div>
-        <div class="col-sm-4 mb-2">
-            <div class="card card-border shadow-none border py-2 px-3">
-                <small class="text-muted">Total Result Records</small>
-                <div class="fw-bold text-dark"><i class="fa-solid fa-list-ol text-teal me-1" style="color: #008080;"></i> {{ $reportData['total_count'] }} records</div>
+
+            <!-- Total Result Records -->
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-records">
+                    <i class="fa-solid fa-list-ol"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Total Result Records</div>
+                    <div class="stat-val-text">
+                        {{ number_format($reportData['total_count']) }} records
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="col-sm-4 mb-2">
-            <div class="card card-border shadow-none border py-2 px-3">
-                <small class="text-muted">Execution Date</small>
-                <div class="fw-bold text-dark"><i class="fa-regular fa-clock text-teal me-1" style="color: #008080;"></i> {{ date('d M, Y h:i A') }}</div>
+
+            <!-- Execution Date -->
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-date">
+                    <i class="fa-regular fa-clock"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Execution Date</div>
+                    <div class="stat-val-text">
+                        {{ date('d M, Y h:i A') }}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Visual Chart (if applicable) -->
     @if(!empty($reportData['chart_data']) && in_array($reportData['output_type'], ['bar', 'line', 'pie', 'doughnut']))
-        <div class="card card-border shadow-none border mb-4">
-            <div class="card-header bg-white py-3 border-bottom">
-                <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-chart-column me-2 text-teal" style="color: #008080;"></i>Visual Chart Analysis</h6>
+        <div class="card modern-table-card border-0 mb-4">
+            <div class="modern-table-header">
+                <h6 class="table-title-text"><i class="fa-solid fa-chart-column text-teal" style="color: #0f766e;"></i> Visual Chart Analysis</h6>
             </div>
             <div class="card-body p-3" style="max-height: 400px; position: relative;">
                 <canvas id="reportChart" height="120"></canvas>
@@ -92,10 +312,10 @@
     @endif
 
     <!-- Data Table -->
-    <div class="card card-border shadow-none border">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-table me-2 text-teal" style="color: #008080;"></i>Report Data Table</h6>
-            <span class="badge bg-light text-dark border">{{ $reportData['total_count'] }} rows</span>
+    <div class="card modern-table-card border-0">
+        <div class="modern-table-header">
+            <h6 class="table-title-text"><i class="fa-solid fa-table text-teal" style="color: #0f766e;"></i> Report Data Table</h6>
+            <span class="badge-rows-count">{{ number_format($reportData['total_count']) }} rows</span>
         </div>
         <div class="card-body p-3">
             <style>
