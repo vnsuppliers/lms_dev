@@ -1,16 +1,26 @@
 @include('layouts.admin.header')
 
 <div class="container-fluid py-3">
-    <!-- Header -->
+    <!-- Header & Action Bar -->
     <div class="row mb-3 align-items-center">
-        <div class="col-md-6">
-            <h4 class="mb-1 text-dark fw-bold"><i class="fa-solid fa-sliders text-teal me-2" style="color: #008080;"></i>Report Builder</h4>
-            <p class="text-muted mb-0 font-smallsize">Configure custom query rules, filters, grouping, calculations and visualization.</p>
+        <div class="col-md-7">
+            <div class="d-flex align-items-center mb-1">
+                <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-secondary me-2" title="Back to Reports" style="width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border-color: #ced4da;">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <h4 class="mb-0 text-dark fw-bold">Report Builder</h4>
+            </div>
+            <p class="text-muted mb-0 font-smallsize ms-4 ps-2">Configure custom query rules, filters, grouping, calculations and visualization.</p>
         </div>
-        <div class="col-md-6 text-md-end mt-2 mt-md-0">
-            <a href="{{ route('admin.reports.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Back to Saved Reports
-            </a>
+        <div class="col-md-5 text-md-end mt-2 mt-md-0">
+            <div class="btn-group">
+                <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-secondary" style="background: #fff; border-color: #ced4da; font-weight: 500; padding: 6px 14px;">
+                    <i class="fa-solid fa-list me-1 text-teal" style="color: #008080;"></i> Saved Reports
+                </a>
+                <button type="button" class="btn btn-sm btn-success text-white" id="btnHeaderSaveReport" style="background-color: #00a65a; border-color: #00a65a; font-weight: 500; padding: 6px 16px;">
+                    <i class="fa-solid fa-floppy-disk me-1"></i> Save Report
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2465,7 +2475,7 @@ $(document).ready(function () {
         }
     }
 
-    $('#btnOpenSaveModal').on('click', function () { $('#saveReportModal').modal('show'); });
+    $('#btnOpenSaveModal, #btnHeaderSaveReport').on('click', function () { $('#saveReportModal').modal('show'); });
 
     $('#btnConfirmSave').on('click', function () {
         let name = $('#saveReportName').val().trim();

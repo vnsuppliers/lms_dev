@@ -40,22 +40,302 @@
     $savedExamResult = $config['exam_result_filter'] ?? 'Total';
 @endphp
 
-<div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="row mb-3 align-items-center">
-        <div class="col-md-6">
-            <h4 class="mb-1 text-dark fw-bold"><i class="fa-solid fa-sliders text-teal me-2" style="color: #008080;"></i>Edit Report Builder: {{ $report->name }}</h4>
-            <p class="text-muted mb-0 font-smallsize">Configure custom query rules, filters, grouping, calculations and visualization.</p>
+<style>
+    /* Modern SaaS Report Builder Theme */
+    .report-builder-page {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .modern-header-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+        margin-bottom: 20px;
+    }
+    .btn-back-square {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #475569;
+        font-size: 15px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .btn-back-square:hover {
+        background: #0f766e;
+        color: #ffffff;
+        border-color: #0f766e;
+        transform: translateX(-2px);
+    }
+    .report-title-main {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.3px;
+        margin-bottom: 2px;
+    }
+    .report-subtitle {
+        color: #64748b;
+        font-size: 13px;
+        margin-bottom: 0;
+    }
+    .badge-edit-mode {
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.2px;
+    }
+    .btn-action-view {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 18px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .btn-action-view:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+    .btn-action-save {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: 1px solid #059669;
+        color: #ffffff !important;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 8px 20px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .btn-action-save:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+        transform: translateY(-1px);
+    }
+
+    /* Modern Quick Stats Strip */
+    .modern-stats-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid #f1f5f9;
+    }
+    @media (max-width: 768px) {
+        .modern-stats-strip {
+            grid-template-columns: 1fr;
+        }
+    }
+    .stat-pill-box {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        transition: all 0.2s ease;
+    }
+    .stat-pill-box:hover {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+    }
+    .stat-icon-wrapper {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    .stat-icon-source {
+        background: #ecfdf5;
+        color: #059669;
+    }
+    .stat-icon-columns {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+    .stat-icon-date {
+        background: #fef3c7;
+        color: #d97706;
+    }
+    .stat-label-text {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #64748b;
+        margin-bottom: 2px;
+    }
+    .stat-val-text {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0;
+        line-height: 1.2;
+    }
+
+    /* Modernized Step Cards */
+    .modern-builder-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+    }
+    .step-badge-number {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 3px 8px rgba(15, 118, 110, 0.25);
+    }
+    .step-heading-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.2px;
+    }
+    .step-heading-subtitle {
+        font-size: 13px;
+        color: #64748b;
+    }
+    .source-card {
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        background: #ffffff !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .source-card:hover {
+        border-color: #0d9488 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(13, 148, 136, 0.08) !important;
+    }
+    .source-card.active-source-card {
+        border-color: #0f766e !important;
+        background: #f0fdfa !important;
+        box-shadow: 0 4px 12px rgba(15, 118, 110, 0.12) !important;
+    }
+    .source-title {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+    .source-desc {
+        color: #64748b !important;
+        font-size: 12px !important;
+        line-height: 1.4 !important;
+    }
+</style>
+
+<div class="container-fluid py-3 report-builder-page">
+    <!-- Modern Header Card -->
+    <div class="modern-header-card">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ route('admin.reports.index') }}" class="btn-back-square" title="Back to Reports">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="report-title-main">{{ $report->name }}</h4>
+                        <span class="badge-edit-mode"><i class="fa-solid fa-pen me-1"></i> Edit Mode</span>
+                    </div>
+                    @if($report->description)
+                        <p class="report-subtitle">{{ $report->description }}</p>
+                    @else
+                        <p class="report-subtitle">Configure data sources, columns, filter rules and visualization</p>
+                    @endif
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <a href="{{ route('admin.reports.run', $report->id) }}" class="btn-action-view">
+                    <i class="fa-solid fa-play text-teal" style="color: #0f766e;"></i> View / Run Report
+                </a>
+                <button type="button" class="btn-action-save" id="btnHeaderSaveReport">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                </button>
+            </div>
         </div>
-        <div class="col-md-6 text-md-end mt-2 mt-md-0">
-            <a href="{{ route('admin.reports.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Back to Saved Reports
-            </a>
+
+        <!-- Integrated Modern Stats Strip -->
+        <div class="modern-stats-strip">
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-source">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Data Source</div>
+                    <div class="stat-val-text text-capitalize">
+                        @if(count($savedSources) > 1)
+                            Multi-Source ({{ count($savedSources) }})
+                        @else
+                            {{ ucfirst(str_replace('_', ' ', $savedSources[0] ?? $report->data_source)) }}
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-columns">
+                    <i class="fa-solid fa-table-columns"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Configured Columns</div>
+                    <div class="stat-val-text">
+                        <span id="headerSelectedColumnsCount">{{ count($savedFields) }} columns selected</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-pill-box">
+                <div class="stat-icon-wrapper stat-icon-date">
+                    <i class="fa-regular fa-clock"></i>
+                </div>
+                <div>
+                    <div class="stat-label-text">Last Modified</div>
+                    <div class="stat-val-text">
+                        {{ $report->updated_at ? \Carbon\Carbon::parse($report->updated_at)->format('d M, Y h:i A') : date('d M, Y h:i A') }}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Builder Form Card -->
-    <div class="card card-border shadow-none border mb-4">
+    <div class="card modern-builder-card border-0 mb-4">
         <div class="card-body p-4">
             <form id="reportBuilderForm">
                 @csrf
@@ -66,10 +346,10 @@
                 <div class="mb-4 pb-3 border-bottom">
                     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
                         <div class="d-flex align-items-center">
-                            <span class="badge rounded-circle p-2 me-2 text-white" style="background-color: #008080; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;">1</span>
+                            <span class="step-badge-number me-2">1</span>
                             <div>
-                                <h5 class="mb-0 fw-bold text-dark">Select Data Sources <span class="badge ms-2 px-2 py-1 font-smallsize text-white" id="selectedSourcesBadge" style="background-color: #008080;">{{ count($savedSources) }} {{ count($savedSources) === 1 ? 'Source Selected' : 'Sources Selected' }}</span></h5>
-                                <small class="text-muted">Select one or multiple related data sources to build a complete cross-functional report.</small>
+                                <h5 class="mb-0 step-heading-title">Select Data Sources <span class="badge ms-2 px-2 py-1 font-smallsize text-white" id="selectedSourcesBadge" style="background-color: #0f766e;">{{ count($savedSources) }} {{ count($savedSources) === 1 ? 'Source Selected' : 'Sources Selected' }}</span></h5>
+                                <small class="step-heading-subtitle">Select one or multiple related data sources to build a complete cross-functional report.</small>
                             </div>
                         </div>
                         <div class="mt-2 mt-sm-0">
@@ -107,10 +387,10 @@
                 <div class="mb-4 pb-3 border-bottom">
                     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
                         <div class="d-flex align-items-center">
-                            <span class="badge rounded-circle p-2 me-2 text-white" style="background-color: #008080; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;">2</span>
+                            <span class="step-badge-number me-2">2</span>
                             <div>
-                                <h5 class="mb-0 fw-bold text-dark">Select Columns to Display <span class="badge bg-secondary ms-2 px-2 py-1 font-smallsize" id="selectedColumnsCount">0 columns selected</span></h5>
-                                <small class="text-muted">Columns are organized by data source. <span class="text-dark fw-semibold"><i class="fa-solid fa-arrow-down-1-9 text-teal me-1" style="color: #008080;"></i>Selection order determines column position (#1, #2, #3...)</span> in Preview & Download.</small>
+                                <h5 class="mb-0 step-heading-title">Select Columns to Display <span class="badge bg-secondary ms-2 px-2 py-1 font-smallsize" id="selectedColumnsCount">0 columns selected</span></h5>
+                                <small class="step-heading-subtitle">Columns are organized by data source. <span class="text-dark fw-semibold"><i class="fa-solid fa-arrow-down-1-9 text-teal me-1" style="color: #0f766e;"></i>Selection order determines column position (#1, #2, #3...)</span> in Preview & Download.</small>
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2 mt-2 mt-sm-0">
@@ -134,12 +414,12 @@
                 <!-- STEP 3: Simple & Smart Filters -->
                 <div class="mb-4 pb-3 border-bottom">
                     <div class="d-flex align-items-center mb-3">
-                        <div>
-                            <div class="d-flex align-items-center">
-                                <span class="badge rounded-circle p-2 me-2 text-white" style="background-color: #008080; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;">3</span>
-                                <h5 class="mb-0 fw-bold text-dark">Filter Records (Optional)</h5>
+                        <div class="d-flex align-items-center">
+                            <span class="step-badge-number me-2">3</span>
+                            <div>
+                                <h5 class="mb-0 step-heading-title">Filter Records (Optional)</h5>
+                                <small class="step-heading-subtitle">Filter records by status, keyword, or date range.</small>
                             </div>
-                            <small class="text-muted ms-4">Filter records by status, keyword, or date range.</small>
                         </div>
                     </div>
 
@@ -663,10 +943,10 @@
                 <!-- STEP 4: Sorting Options -->
                 <div class="mb-4 pb-3 border-bottom">
                     <div class="d-flex align-items-center mb-3">
-                        <span class="badge rounded-circle p-2 me-2 text-white" style="background-color: #008080; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;">4</span>
+                        <span class="step-badge-number me-2">4</span>
                         <div>
-                            <h5 class="mb-0 fw-bold text-dark">Sort Records (Optional)</h5>
-                            <small class="text-muted">Set the primary sorting column and order direction for your reports.</small>
+                            <h5 class="mb-0 step-heading-title">Sort Records (Optional)</h5>
+                            <small class="step-heading-subtitle">Set the primary sorting column and order direction for your reports.</small>
                         </div>
                     </div>
                     <div id="step4SortWrapper">
@@ -1600,6 +1880,7 @@ $(document).ready(function () {
         let count = selectedFieldsOrder.length;
         let text = count === 1 ? '1 column selected' : (count + ' columns selected');
         $('#selectedColumnsCount').text(text);
+        $('#headerSelectedColumnsCount').text(text);
 
         // Keep form's ordered hidden fields container in sync for direct export
         let $container = $('#orderedFieldsContainer');
@@ -2622,7 +2903,7 @@ $(document).ready(function () {
         }
     }
 
-    $('#btnOpenSaveModal').on('click', function () { $('#saveReportModal').modal('show'); });
+    $('#btnOpenSaveModal, #btnHeaderSaveReport').on('click', function () { $('#saveReportModal').modal('show'); });
 
     $('#btnConfirmSave').on('click', function () {
         let name = $('#saveReportName').val().trim();
