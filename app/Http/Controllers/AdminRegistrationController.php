@@ -1375,8 +1375,15 @@ $courseNames = $courses->map(function ($course) {
     } else {
         $hasAnyCourses = false;
 
+        $parentCourseIdsInAssessments = $assessments->pluck('course_id')->toArray();
+
         foreach ($assessments as $data) {
             if (!$data->course_details) {
+                continue;
+            }
+
+            // If this course is itself a sub-course and its parent course is also assigned, skip top-level so it renders under its parent
+            if (!empty($data->course_details->parent_id) && in_array($data->course_details->parent_id, $parentCourseIdsInAssessments)) {
                 continue;
             }
 
@@ -1473,6 +1480,7 @@ $courseNames = $courses->map(function ($course) {
                                 $q->where('assigned_id', $data->id)
                                   ->orWhere(function ($sub) use ($data, $user) {
                                       $sub->where('user_id', $user->id)
+                                          ->whereNull('assigned_id')
                                           ->where('course_id', $data->course_id);
                                   });
                             })
@@ -1503,14 +1511,18 @@ $courseNames = $courses->map(function ($course) {
                 $canShowCertificate = $canShowCertificate && $data->isCompletedAndPassed();
             }
 
-            // Gather assignment exam items for this course & user
+            // Gather assignment exam items for this course & user (bound to current assignment, excluding old reassigned attempts)
             $assignment_exams = ExamAttempt::with('exam_details')
                 ->whereHas('exam_details')
                 ->where('user_id', $user->id)
+                ->where('course_id', $data->course_id)
                 ->where(function ($q) use ($data) {
                     $q->where('assigned_id', $data->id)
-                      ->orWhere('course_id', $data->course_id);
+                      ->orWhere(function ($sub) use ($data) {
+                          $sub->whereNull('assigned_id')->where('course_id', $data->course_id);
+                      });
                 })
+                ->orderBy('id', 'desc')
                 ->get();
 
             $hasAnyAssignmentAttempted = $assignment_exams->isNotEmpty();
@@ -1623,7 +1635,7 @@ $courseNames = $courses->map(function ($course) {
                                 'lms_url' => url('/')
                             ]);
 
-                            $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-course-id="' . $data->id . '" data-link="' . htmlspecialchars($launchUrl) . '" class="btn btn-sm btn-outline-primary text-nowrap px-3 py-1 take_result" style="font-size: 12px; border-radius: 4px;"><i class="fa-solid fa-eye me-1"></i>View Result</a>';
+                            $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-course-id="' . $data->id . '" data-link="' . htmlspecialchars($launchUrl) . '" class="btn btn-sm btn-outline-primary text-nowrap px-2 py-1 take_result" style="font-size: 11px; border-radius: 4px;"><i class="fa-solid fa-eye me-1"></i>View Result</a>';
                         }
                     }
 
@@ -1759,16 +1771,11 @@ $courseNames = $courses->map(function ($course) {
                         $viewAttemptUrl = url('view_attempted_exam') . '?assigned_id=' . $item['assigned_id'] . '&course_id=' . $item['course_id'] . '&exam_id=' . $item['exam_id'] . '&user_id=' . $user->id;
 
                         if ($statusLower === 'pending') {
-                            $actionBtn = '<div class="d-flex align-items-center justify-content-center gap-1">
-                                <a href="' . $resultUrl . '" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap px-3 py-1" style="font-size: 12px; border-radius: 4px;">
-                                    <i class="fa-solid fa-eye me-1"></i>View Result
-                                </a>
-                                <a href="' . $viewAttemptUrl . '" target="_blank" class="btn btn-outline-primary btn-sm text-nowrap px-3 py-1" style="font-size: 12px; border-radius: 4px;">
-                                    <i class="fa-solid fa-pen-to-square me-1"></i>Evaluate
-                                </a>
-                            </div>';
+                            $actionBtn = '<a href="' . $viewAttemptUrl . '" target="_blank" class="btn btn-outline-primary btn-sm text-nowrap px-2 py-1" style="font-size: 11px; border-radius: 4px;">
+                                <i class="fa-solid fa-pen-to-square me-1"></i>Evaluate
+                            </a>';
                         } else {
-                            $actionBtn = '<a href="' . $resultUrl . '" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap px-3 py-1" style="font-size: 12px; border-radius: 4px;">
+                            $actionBtn = '<a href="' . $resultUrl . '" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap px-2 py-1" style="font-size: 11px; border-radius: 4px;">
                                 <i class="fa-solid fa-eye me-1"></i>View Result
                             </a>';
                         }
@@ -1847,62 +1854,36 @@ $courseNames = $courses->map(function ($course) {
             }
 
             $childCardsHtml = '';
+            $combinedRows = ($hasAssessments ? $table1_rows : '') . $table2_rows;
 
-            // Card 1: Course Assessments (only if course has assessments)
-            if ($hasAssessments && !empty($table1_rows)) {
-                $childCardsHtml .= '
-                <div class="card border rounded-3 ' . (!empty($table2_rows) ? 'mb-3' : 'mb-0') . ' shadow-sm bg-white overflow-hidden">
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle mb-0" style="table-layout: fixed; width: 100%;">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 14%; text-align: center; font-weight: 600; padding: 12px 14px;">Type</th>
-                                    <th style="width: 38%; font-weight: 600; padding: 12px 16px;">Name</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Score</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Status</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ' . $table1_rows . '
-                            </tbody>
-                        </table>
-                    </div>
-                </div>';
-            }
-
-            // Card 2: Course Assignments (only if course has assignments)
-            if (!empty($table2_rows)) {
-                $hasHeaderAbove = ($hasAssessments && !empty($table1_rows));
-                $childCardsHtml .= '
+            if (!empty($combinedRows)) {
+                $childCardsHtml = '
                 <div class="card border rounded-3 mb-0 shadow-sm bg-white overflow-hidden">
                     <div class="table-responsive">
                         <table class="table table-bordered align-middle mb-0" style="table-layout: fixed; width: 100%;">
                             <colgroup>
+                                <col style="width: 12%;">
+                                <col style="width: 32%;">
                                 <col style="width: 14%;">
-                                <col style="width: 38%;">
                                 <col style="width: 16%;">
-                                <col style="width: 16%;">
-                                <col style="width: 16%;">
-                            </colgroup>' . (!$hasHeaderAbove ? '
+                                <col style="width: 26%; min-width: 200px;">
+                            </colgroup>
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 14%; text-align: center; font-weight: 600; padding: 12px 14px;">Type</th>
-                                    <th style="width: 38%; font-weight: 600; padding: 12px 16px;">Name</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Score</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Status</th>
-                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 12px 14px;">Action</th>
+                                    <th style="width: 12%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Type</th>
+                                    <th style="width: 32%; font-weight: 600; padding: 10px 16px; font-size: 13px;">Name</th>
+                                    <th style="width: 14%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Score</th>
+                                    <th style="width: 16%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Status</th>
+                                    <th style="width: 26%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Action</th>
                                 </tr>
-                            </thead>' : '') . '
+                            </thead>
                             <tbody>
-                                ' . $table2_rows . '
+                                ' . $combinedRows . '
                             </tbody>
                         </table>
                     </div>
                 </div>';
-            }
-
-            if (empty($childCardsHtml)) {
+            } else {
                 $childCardsHtml = '
                 <div class="card border rounded-3 mb-0 shadow-sm bg-white p-3 text-center text-muted">
                     No assessments or assignments found for this course.
@@ -1916,10 +1897,26 @@ $courseNames = $courses->map(function ($course) {
                 </div>
             </div>';
 
+            // Check for child sub-courses
+            $subCoursesList = collect();
+            if (empty($data->course_details->parent_id)) {
+                $subCoursesList = Courses::where('parent_id', $data->course_details->id)
+                    ->where('is_delete', 0)
+                    ->with(['assignment_exam.assignment_exam_name', 'parent_course'])
+                    ->get();
+            }
+            $hasChildSubCourses = $subCoursesList->isNotEmpty();
+            $parentRowStyle = $hasChildSubCourses ? 'style="border-left: 4px solid #005452 !important;"' : '';
+
             // Main course row
-            $course_html_data .= '<tr>
+            $isStandaloneSub = !empty($data->course_details->parent_id);
+            $courseIconTitle = $isStandaloneSub
+                ? '<span class="badge me-2" style="background-color: #005452; color: #fff; font-size: 11px; padding: 3px 8px; font-weight: 500;">Sub Course</span>' . htmlspecialchars($data->course_details->course_name ?? 'N/A') . ' <small class="text-muted ms-1" style="font-size: 12px;">(Parent Course: ' . htmlspecialchars($data->course_details->parent_course->course_name ?? 'N/A') . ')</small>'
+                : '<i class="fa-solid fa-graduation-cap text-primary me-2"></i>' . htmlspecialchars($data->course_details->course_name ?? 'N/A');
+
+            $course_html_data .= '<tr ' . $parentRowStyle . '>
                 <td class="fw-bold align-middle" style="padding: 14px 18px; font-size: 14px; color: #212529 !important;">
-                    <i class="fa-solid fa-graduation-cap text-primary me-2"></i>' . htmlspecialchars($data->course_details->course_name ?? 'N/A') . '
+                    ' . $courseIconTitle . '
                 </td>
                 <td class="align-middle" style="padding: 10px 18px;">
                     <div class="d-flex align-items-center justify-content-end gap-2">
@@ -1930,11 +1927,369 @@ $courseNames = $courses->map(function ($course) {
                     </div>
                 </td>
             </tr>
-            <tr class="collapse-row">
+            <tr class="collapse-row" ' . $parentRowStyle . '>
                 <td colspan="2" class="p-0 border-0">
                     ' . $dropdownTablesHtml . '
                 </td>
             </tr>';
+
+            // Sub-courses belonging to this course (in Section 1: Course Assessments & Certificates)
+            if ($hasChildSubCourses) {
+                foreach ($subCoursesList as $subCourse) {
+                    $subCourseAssessments = Course_documents::where('course_id', $subCourse->id)
+                        ->where('type', 6)
+                        ->where('is_delete', 0)
+                        ->where(function ($q) {
+                            $q->where('is_active', 1)->orWhereNull('is_active');
+                        })
+                        ->whereNotNull('file_name')
+                        ->where('file_name', '!=', '')
+                        ->get();
+
+                    $subCourseAssignments = Course_documents::where('course_id', $subCourse->id)
+                        ->where('type', 7)
+                        ->where('is_delete', 0)
+                        ->where(function ($q) {
+                            $q->where('is_active', 1)->orWhereNull('is_active');
+                        })
+                        ->get();
+
+                    $subDefinedExams = $subCourse->assignment_exam ?? collect();
+
+                    $subHasAssess = $subCourseAssessments->isNotEmpty();
+                    $subHasAssign = $subCourseAssignments->isNotEmpty();
+                    $subHasDefinedExams = $subDefinedExams->isNotEmpty();
+
+                    if (!$subHasAssess && !$subHasAssign && !$subHasDefinedExams) {
+                        continue;
+                    }
+
+                    $subAllAssessPassed = true;
+                    $subHasFailedAssess = false;
+                    $subTable1_rows = '';
+
+                    if ($subHasAssess) {
+                        $subTotalAssess = $subCourseAssessments->count();
+                        foreach ($subCourseAssessments as $subIdx => $assess) {
+                            $result_datas = Assessment_results::where('course_document_id', $assess->id)
+                                ->where('user_id', $user->id)
+                                ->whereNull('deleted_at')
+                                ->latest()
+                                ->first();
+
+                            $isPassed = false;
+                            $statusLabel = 'Not Attempted';
+                            $badgeClass = 'bg-secondary';
+
+                            if (!empty($result_datas)) {
+                                $payload = json_decode($result_datas->result_data ?? '', true);
+                                $details = $payload['results'] ?? json_decode($result_datas->results ?? '', true);
+                                $passFail = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+
+                                if ($result_datas->hasPassed() || $passFail === 'passed') {
+                                    $isPassed = true;
+                                    $badgeClass = 'bg-success';
+                                    $statusLabel = 'Passed';
+                                } elseif ($passFail === 'failed' || strtolower($result_datas->status ?? '') === 'completed') {
+                                    $badgeClass = 'bg-danger';
+                                    $statusLabel = 'Failed';
+                                    $subHasFailedAssess = true;
+                                    $subAllAssessPassed = false;
+                                } elseif (in_array(strtolower($result_datas->status ?? ''), ['in-progress', 'inprogress'])) {
+                                    $badgeClass = 'bg-warning text-dark';
+                                    $statusLabel = 'In Progress';
+                                    $subAllAssessPassed = false;
+                                } else {
+                                    $subAllAssessPassed = false;
+                                }
+                            } else {
+                                $subAllAssessPassed = false;
+                            }
+
+                            if (!$isPassed) {
+                                $subAllAssessPassed = false;
+                            }
+
+                            $assessmentStatusBadge = '<span class="badge ' . $badgeClass . ' px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">' . $statusLabel . '</span>';
+
+                            $result_html = '<span class="text-muted small">-</span>';
+                            if (!empty($result_datas)) {
+                                $link = explode('/', $assess->file_path ?? '');
+                                $code = $result_datas->code ?? '';
+                                if (!empty($link[0]) && !empty($link[1]) && !empty($code)) {
+                                    $result_link = "{$link[0]}/{$link[1]}/results/{$code}";
+                                    $assessmentBaseUrl = config('app.assessment_url', env('ASSESSMENT_URL', 'http://127.0.0.1:8001'));
+                                    $returnUrl = url('users?tab=2&userId=' . $user->id . '&open_tab=reports&course_id=' . $data->id);
+
+                                    $launchUrl = rtrim($assessmentBaseUrl, '/') . '/start_assessment?' . http_build_query([
+                                        'url' => $result_link,
+                                        'email' => $user->email,
+                                        'username' => $user->username,
+                                        'first_name' => $user->first_name,
+                                        'last_name' => $user->emp_id,
+                                        'course_id' => $assess->id,
+                                        'assign_id' => $data->id,
+                                        'return_url' => $returnUrl,
+                                        'lms_url' => url('/')
+                                    ]);
+
+                                    $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-course-id="' . $data->id . '" data-link="' . htmlspecialchars($launchUrl) . '" class="btn btn-sm btn-outline-primary text-nowrap px-2 py-1 take_result" style="font-size: 11px; border-radius: 4px;"><i class="fa-solid fa-eye me-1"></i>View Result</a>';
+                                }
+                            }
+
+                            $assessmentScoreHtml = '<span class="text-muted small">-</span>';
+                            if (!empty($result_datas)) {
+                                $payload = json_decode($result_datas->result_data ?? '', true);
+                                $details = $payload['results'] ?? json_decode($result_datas->results ?? '', true);
+
+                                $scoreVal = isset($details['score']) && $details['score'] !== '' ? $details['score'] : (isset($details['marks_earned']) && $details['marks_earned'] !== '' ? $details['marks_earned'] : null);
+                                $totalMarks = isset($details['total_marks']) && $details['total_marks'] !== '' ? $details['total_marks'] : (isset($details['total_questions']) && $details['total_questions'] !== '' ? $details['total_questions'] : null);
+                                $percentage = isset($details['percentage']) && $details['percentage'] !== '' ? $details['percentage'] : null;
+
+                                if ($scoreVal !== null && $totalMarks !== null) {
+                                    $pctStr = ($percentage !== null) ? ' <span class="text-muted small">(' . round((float)$percentage, 1) . '%)</span>' : '';
+                                    $assessmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $scoreVal . ' / ' . $totalMarks . '</span>' . $pctStr;
+                                } elseif ($percentage !== null) {
+                                    $assessmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . round((float)$percentage, 1) . '%</span>';
+                                } elseif ($scoreVal !== null) {
+                                    $assessmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $scoreVal . '</span>';
+                                }
+                            }
+
+                            $typeTd = '';
+                            if ($subIdx === 0) {
+                                $typeTd = '<td rowspan="' . $subTotalAssess . '" class="text-center align-middle bg-white" style="padding: 12px 14px;"><span class="badge bg-light text-primary border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assessment</span></td>';
+                            }
+
+                            $subTable1_rows .= '<tr>
+                                ' . $typeTd . '
+                                <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important;">' . htmlspecialchars($assess->file_name ?? 'Assessment') . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $assessmentScoreHtml . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $assessmentStatusBadge . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $result_html . '</td>
+                            </tr>';
+                        }
+                    }
+
+                    $subAssignmentExams = ExamAttempt::with('exam_details')
+                        ->whereHas('exam_details')
+                        ->where('user_id', $user->id)
+                        ->where('course_id', $subCourse->id)
+                        ->where(function ($q) use ($subCourse, $data, $user) {
+                            $subAssign = AsignedUser::where('user_id', $user->id)->where('course_id', $subCourse->id)->first();
+                            if ($subAssign) {
+                                $q->where('assigned_id', $subAssign->id)
+                                  ->orWhereNull('assigned_id');
+                            } else {
+                                $q->where('assigned_id', $data->id)
+                                  ->orWhereNull('assigned_id');
+                            }
+                        })
+                        ->orderBy('id', 'desc')
+                        ->get();
+
+                    $subItems = [];
+                    $subHandledExamIds = [];
+
+                    if ($subDefinedExams->isNotEmpty()) {
+                        foreach ($subDefinedExams as $assignExamDoc) {
+                            $examModel = $assignExamDoc->assignment_exam_name ?? null;
+                            $examId = $examModel->id ?? null;
+                            $examName = $examModel->name ?? ($assignExamDoc->file_name ?? 'Assignment Exam');
+
+                            $attempt = null;
+                            if ($examId) {
+                                $attempt = $subAssignmentExams->firstWhere('exam_id', $examId);
+                            }
+                            if (!$attempt && $assignExamDoc->file_path) {
+                                $attempt = $subAssignmentExams->first(function ($att) use ($assignExamDoc) {
+                                    return optional($att->exam_details)->exam_code === $assignExamDoc->file_path;
+                                });
+                            }
+
+                            if ($attempt) {
+                                $subHandledExamIds[] = $attempt->id;
+                                $subItems[] = [
+                                    'status' => $attempt->exam_result ?? ($attempt->status ?? 'N/A'),
+                                    'name' => $examName,
+                                    'attempt' => $attempt,
+                                    'assigned_id' => $attempt->assigned_id ?: $data->id,
+                                    'course_id' => $attempt->course_id ?: $subCourse->id,
+                                    'exam_id' => $attempt->exam_id ?: $examId,
+                                    'exam_code' => optional($attempt->exam_details)->exam_code ?? ($assignExamDoc->file_path ?? ''),
+                                ];
+                            } else {
+                                $subItems[] = [
+                                    'status' => 'Not Attempted',
+                                    'name' => $examName,
+                                    'attempt' => null,
+                                    'assigned_id' => $data->id,
+                                    'course_id' => $subCourse->id,
+                                    'exam_id' => $examId,
+                                    'exam_code' => $assignExamDoc->file_path ?? '',
+                                ];
+                            }
+                        }
+                    }
+
+                    foreach ($subAssignmentExams as $attempt) {
+                        if (in_array($attempt->id, $subHandledExamIds)) {
+                            continue;
+                        }
+                        if ($attempt->course_id == $subCourse->id) {
+                            $examName = optional($attempt->exam_details)->name ?? 'N/A';
+                            $subItems[] = [
+                                'status' => $attempt->exam_result ?? ($attempt->status ?? 'N/A'),
+                                'name' => $examName,
+                                'attempt' => $attempt,
+                                'assigned_id' => $attempt->assigned_id ?: $data->id,
+                                'course_id' => $attempt->course_id ?: $subCourse->id,
+                                'exam_id' => $attempt->exam_id,
+                                'exam_code' => optional($attempt->exam_details)->exam_code ?? '',
+                            ];
+                        }
+                    }
+
+                    $subTable2_rows = '';
+                    if (!empty($subItems)) {
+                        $totalSubAssignments = count($subItems);
+                        foreach ($subItems as $subItemIdx => $item) {
+                            $rawStatus = trim($item['status'] ?? 'Not Attempted');
+                            $statusLower = strtolower($rawStatus);
+                            $isExamPassed = ($statusLower === 'passed' || $statusLower === 'completed');
+
+                            if ($isExamPassed) {
+                                $statusBadge = '<span class="badge bg-success px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Passed</span>';
+                            } elseif ($statusLower === 'failed') {
+                                $statusBadge = '<span class="badge bg-danger px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Failed</span>';
+                            } elseif ($statusLower === 'pending' || $statusLower === 'in-progress' || $statusLower === 'inprogress') {
+                                $statusBadge = '<span class="badge bg-warning text-dark px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">' . ucfirst($rawStatus) . '</span>';
+                            } else {
+                                $statusBadge = '<span class="badge bg-secondary px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Not Attempted</span>';
+                            }
+
+                            $actionBtn = '';
+                            if (!empty($item['attempt'])) {
+                                $resultUrl = route('admin.exams.Resultview') . '?course_id=' . $item['course_id'] . '&exam_name=' . urlencode($item['exam_code']) . '&ex_c=' . $item['exam_id'] . '&user_id=' . $user->id . '&attempt_id=' . $item['attempt']->id;
+                                $viewAttemptUrl = url('view_attempted_exam') . '?assigned_id=' . $item['assigned_id'] . '&course_id=' . $item['course_id'] . '&exam_id=' . $item['exam_id'] . '&user_id=' . $user->id;
+
+                                if ($statusLower === 'pending') {
+                                    $actionBtn = '<a href="' . $viewAttemptUrl . '" target="_blank" class="btn btn-outline-primary btn-sm text-nowrap px-2 py-1" style="font-size: 11px; border-radius: 4px;">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i>Evaluate
+                                    </a>';
+                                } else {
+                                    $actionBtn = '<a href="' . $resultUrl . '" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap px-2 py-1" style="font-size: 11px; border-radius: 4px;">
+                                        <i class="fa-solid fa-eye me-1"></i>View Result
+                                    </a>';
+                                }
+                            } else {
+                                $actionBtn = '<span class="text-muted small">-</span>';
+                            }
+
+                            $assignmentScoreHtml = '<span class="text-muted small">-</span>';
+                            if (!empty($item['attempt'])) {
+                                if ($statusLower === 'pending') {
+                                    $assignmentScoreHtml = '<span class="badge bg-warning text-dark px-2 py-1" style="font-size: 11px;">Under Evaluation</span>';
+                                } else {
+                                    $totalExamMarks = Question::where('exam_id', $item['exam_id'])->sum('question_mark');
+                                    $userObtainedMarks = Answer::where('exam_attendance_id', $item['attempt']->id)->sum('answer_marks');
+                                    if ($totalExamMarks > 0) {
+                                        $pct = round(($userObtainedMarks / $totalExamMarks) * 100, 1);
+                                        $assignmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $userObtainedMarks . ' / ' . $totalExamMarks . '</span> <span class="text-muted small">(' . $pct . '%)</span>';
+                                    } else {
+                                        $assignmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $userObtainedMarks . '</span>';
+                                    }
+                                }
+                            }
+
+                            $typeTd = '';
+                            if ($subItemIdx === 0) {
+                                $typeTd = '<td rowspan="' . $totalSubAssignments . '" class="text-center align-middle bg-white" style="padding: 12px 14px;"><span class="badge bg-light text-info border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assignment</span></td>';
+                            }
+
+                            $subTable2_rows .= '<tr>
+                                ' . $typeTd . '
+                                <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important;">' . htmlspecialchars($item['name']) . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $assignmentScoreHtml . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $statusBadge . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $actionBtn . '</td>
+                            </tr>';
+                        }
+                    }
+
+                    $subCollapseId = 'subCourseCollapse_' . $subCourse->id . '_' . $data->id;
+                    $subChildCardsHtml = '';
+                    $subCombinedRows = ($subHasAssess ? $subTable1_rows : '') . (($subHasAssign || $subHasDefinedExams) ? $subTable2_rows : '');
+
+                    if (!empty($subCombinedRows)) {
+                        $subChildCardsHtml = '
+                        <div class="card border rounded-3 mb-0 shadow-sm bg-white overflow-hidden">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0" style="table-layout: fixed; width: 100%;">
+                                    <colgroup>
+                                        <col style="width: 12%;">
+                                        <col style="width: 32%;">
+                                        <col style="width: 14%;">
+                                        <col style="width: 16%;">
+                                        <col style="width: 26%; min-width: 200px;">
+                                    </colgroup>
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 12%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Type</th>
+                                            <th style="width: 32%; font-weight: 600; padding: 10px 16px; font-size: 13px;">Name</th>
+                                            <th style="width: 14%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Score</th>
+                                            <th style="width: 16%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Status</th>
+                                            <th style="width: 26%; text-align: center; font-weight: 600; padding: 10px 14px; font-size: 13px;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ' . $subCombinedRows . '
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>';
+                    } else {
+                        $subChildCardsHtml = '
+                        <div class="card border rounded-3 mb-0 shadow-sm bg-white p-3 text-center text-muted">
+                            No assessments or assignments found for this sub course.
+                        </div>';
+                    }
+
+                    $subDropdownTablesHtml = '
+                    <div class="collapse" id="' . $subCollapseId . '">
+                        <div class="p-4 border-bottom" style="background-color: #f8fafc;">
+                            ' . $subChildCardsHtml . '
+                        </div>
+                    </div>';
+
+                    // Append Sub-Course Row right under its Parent Course!
+                    $course_html_data .= '<tr style="background-color: #f7faf9; border-left: 4px solid #005452 !important; border-top: 1px dashed #b2cfcb;">
+                        <td class="fw-semibold align-middle" style="padding: 12px 18px 12px 32px; font-size: 13.5px; color: #212529 !important;">
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                <span style="display: inline-block; width: 14px; height: 16px; border-left: 2px solid #005452; border-bottom: 2px solid #005452; border-bottom-left-radius: 4px; margin-right: 2px; margin-top: -6px; vertical-align: middle;"></span>
+                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center me-1 flex-shrink-0" style="width: 22px; height: 22px; background: rgba(0, 84, 82, 0.1); color: #005452;">
+                                    <i class="fa-solid fa-code-branch" style="font-size: 11px;"></i>
+                                </div>
+                                <span class="badge" style="background-color: #005452; color: #fff; font-size: 11px; padding: 3px 8px; font-weight: 500;">Sub Course</span>
+                                <span style="font-weight: 600;">' . htmlspecialchars($subCourse->course_name ?? 'Sub Course') . '</span>
+                                <small class="text-muted ms-1" style="font-size: 12px;">(Parent Course: ' . htmlspecialchars($data->course_details->course_name ?? 'Main Course') . ')</small>
+                            </div>
+                        </td>
+                        <td class="align-middle" style="padding: 10px 18px;">
+                            <div class="d-flex align-items-center justify-content-end gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle-course px-3 py-1" data-bs-toggle="collapse" data-bs-target="#' . $subCollapseId . '" aria-expanded="false" aria-controls="' . $subCollapseId . '" title="View Details">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="collapse-row" style="border-left: 4px solid #005452 !important;">
+                        <td colspan="2" class="p-0 border-0">
+                            ' . $subDropdownTablesHtml . '
+                        </td>
+                    </tr>';
+                }
+            }
         }
 
         if (!$hasAnyCourses) {
@@ -1992,10 +2347,12 @@ $userData['assignment_modals_html'] = $assignment_modals_html;
 $userData['activity_html'] = $activity_html_data;
 
 // Build Course Reports HTML (Identical metrics to user-side reports)
-$userAssignedForReports = Asigneduser::with(['course_details.category_details', 'category_details'])
+$userAssignedForReports = Asigneduser::with(['course_details.category_details', 'category_details', 'course_details.parent_course'])
     ->where('user_id', $user->id)
     ->has('course_details')
     ->get();
+
+$parentCourseIdsInReports = $userAssignedForReports->pluck('course_id')->toArray();
 
 $overallTotalSeconds = 0;
 $overallAttemptCount = 0;
@@ -2005,6 +2362,11 @@ $coursesReportsCardsHtml = '';
 
 foreach ($userAssignedForReports as $idx => $assign) {
     $cDetails = $assign->course_details;
+
+    // If this course is a sub-course and its parent course is already in reports, skip so it renders under its parent
+    if (!empty($cDetails->parent_id) && in_array($cDetails->parent_id, $parentCourseIdsInReports)) {
+        continue;
+    }
     $courseId = $assign->course_id;
 
     $cDocIds = Course_documents::where('course_id', $courseId)
@@ -2024,7 +2386,9 @@ foreach ($userAssignedForReports as $idx => $assign) {
     $cExamAttempts = ExamAttempt::where('user_id', $user->id)
         ->where(function($q) use ($assign, $courseId) {
             $q->where('assigned_id', $assign->id)
-              ->orWhere('course_id', $courseId);
+              ->orWhere(function ($sub) use ($courseId) {
+                  $sub->whereNull('assigned_id')->where('course_id', $courseId);
+              });
         })
         ->orderBy('id', 'asc')
         ->get();
@@ -2281,46 +2645,11 @@ foreach ($userAssignedForReports as $idx => $assign) {
         $cAssessmentOptionsMap[$aKey] = $optData;
     }
 
-    if ($hasAssign) {
-        $uniqueExamCodes = $cActiveAssignments->pluck('file_path')->filter()->unique();
-        foreach ($uniqueExamCodes as $examCode) {
-            $exam = Exam::where('exam_code', $examCode)->first();
-            $examName = $exam && !empty($exam->name) ? $exam->name : $examCode;
-            $examId = $exam ? $exam->id : 0;
-            $eAtts = $cExamAttempts->where('exam_id', $examId);
-            $eCount = min(3, $eAtts->count());
-            $eIsPassed = $eAtts->contains(fn($a) => strtolower(trim($a->exam_result ?? '')) === 'passed');
-
-            $eScores = [];
-            $eLatest = $eAtts->count() > 3 ? $eAtts->slice(-3)->values() : $eAtts;
-            foreach ($eLatest as $a) {
-                if (isset($a->percentage) && is_numeric($a->percentage)) {
-                    $eScores[] = round((float)$a->percentage, 1);
-                }
-            }
-
-            $eStatus = $eIsPassed ? 'Passed' : ($eCount > 0 ? 'Failed' : 'Not Attempted');
-            $eKey = 'exam_' . $examId;
-
-            $optData = [
-                'key' => $eKey,
-                'name' => $examName,
-                'type' => 'Assignment',
-                'attempts' => $eCount,
-                'status' => $eStatus,
-                'highest_score' => !empty($eScores) ? max($eScores) . '%' : '-',
-                'lowest_score' => !empty($eScores) ? min($eScores) . '%' : '-',
-            ];
-            $cAssessmentOptions[] = $optData;
-            $cAssessmentOptionsMap[$eKey] = $optData;
-        }
-    }
-
     $cFirstAssess = !empty($cAssessmentOptions) ? $cAssessmentOptions[0] : null;
-    $cCardAttempts = $cFirstAssess ? $cFirstAssess['attempts'] : $cAttempts;
-    $cCardStatus = $cFirstAssess ? $cFirstAssess['status'] : ($cHasPassed ? 'Passed' : ($cAttempts > 0 ? 'Failed' : 'Not Attempted'));
-    $cCardHighest = $cFirstAssess ? $cFirstAssess['highest_score'] : $cHighest;
-    $cCardLowest = $cFirstAssess ? $cFirstAssess['lowest_score'] : $cLowest;
+    $cCardAttempts = $cFirstAssess ? $cFirstAssess['attempts'] : ($hasAssess ? $cAttempts : 0);
+    $cCardStatus = $cFirstAssess ? $cFirstAssess['status'] : ($hasAssess ? ($cHasPassed ? 'Passed' : ($cAttempts > 0 ? 'Failed' : 'Not Attempted')) : 'No Assessment');
+    $cCardHighest = $cFirstAssess ? $cFirstAssess['highest_score'] : ($hasAssess ? $cHighest : '-');
+    $cCardLowest = $cFirstAssess ? $cFirstAssess['lowest_score'] : ($hasAssess ? $cLowest : '-');
 
     if ($cCardStatus === 'Passed') {
         $cCardBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
@@ -2333,11 +2662,13 @@ foreach ($userAssignedForReports as $idx => $assign) {
     // Dropdown HTML for multi-assessment courses
     $cDropdownHtml = '';
     if (count($cAssessmentOptions) > 1) {
-        $cDropdownHtml .= '<div class="ms-auto" style="min-width: 170px; max-width: 240px;">';
-        $cDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">';
+        $cDropdownHtml .= '<div class="ms-auto flex-shrink-0" style="max-width: 50%;">';
+        $cDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 12px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px; width: 100%;">';
         foreach ($cAssessmentOptions as $idxOpt => $opt) {
             $selected = ($idxOpt === 0) ? 'selected' : '';
-            $cDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" ' . $selected . '>' . htmlspecialchars($opt['name']) . '</option>';
+            $fullName = $opt['name'];
+            $shortName = mb_strlen($fullName) > 22 ? mb_substr($fullName, 0, 20) . '...' : $fullName;
+            $cDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" title="' . htmlspecialchars($fullName) . '" ' . $selected . '>' . htmlspecialchars($shortName) . '</option>';
         }
         $cDropdownHtml .= '</select></div>';
     }
@@ -2354,39 +2685,36 @@ foreach ($userAssignedForReports as $idx => $assign) {
     $ariaExpanded = $isFirst ? 'true' : 'false';
 
     $coursesReportsCardsHtml .= '
-    <div class="card mb-4 border rounded-3 shadow-sm bg-white overflow-hidden" style="border: 1px solid #e2e8f0 !important;">
-        <div class="card-header py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 cursor-pointer ' . $headerCollapsedClass . '" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;" data-bs-toggle="collapse" data-bs-target="#' . $collapseId . '" aria-expanded="' . $ariaExpanded . '" aria-controls="' . $collapseId . '">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 42px; height: 42px; background: rgba(0, 84, 82, 0.1); color: #005452;">
+    <div class="card mb-3 border rounded-3 shadow-sm bg-white overflow-hidden" style="border: 1px solid #e2e8f0 !important;">
+        <div class="card-header py-2.5 px-3 d-flex align-items-center justify-content-between cursor-pointer ' . $headerCollapsedClass . '" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-wrap: nowrap; gap: 12px;" data-bs-toggle="collapse" data-bs-target="#' . $collapseId . '" aria-expanded="' . $ariaExpanded . '" aria-controls="' . $collapseId . '">
+            <div class="d-flex align-items-center me-2" style="min-width: 0; flex: 1 1 auto;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 38px; height: 38px; background: rgba(0, 84, 82, 0.1); color: #005452;">
                     <i class="fa-solid fa-graduation-cap fs-5"></i>
                 </div>
-                <div>
-                    <h6 class="fw-bold text-dark mb-1" style="font-size: 1rem;">' . $courseName . '</h6>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-white text-secondary border px-2 py-1"><i class="fa-regular fa-folder me-1 text-primary"></i>' . $catName . '</span>
-                    </div>
+                <div style="min-width: 0;">
+                    <h6 class="fw-bold text-dark mb-0 text-truncate" style="font-size: 14px;">' . $courseName . '</h6>
+                    <div class="text-muted text-truncate" style="font-size: 12px; font-weight: normal; margin-top: 2px;">' . $catName . '</div>
                 </div>
             </div>
-            <div class="d-flex align-items-center gap-3">
-                ' . $cBadge . '
-                <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-muted" style="width: 32px; height: 32px;">
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-muted" style="width: 30px; height: 30px;">
                     <i class="fa-solid fa-chevron-down fs-7 chevron-icon"></i>
                 </div>
             </div>
         </div>
         <div id="' . $collapseId . '" class="collapse ' . $collapseClass . '" data-bs-parent="#courseReportsAccordion">
-            <div class="card-body p-4 bg-white">
-                <div class="row g-4">
+            <div class="card-body p-3 bg-white">
+                <div class="row g-3">
                     <!-- Card 1: Total Learning Time -->
                     <div class="col-12 col-md-6">
                         <div class="report-stat-card">
-                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
-                                    <i class="fa-solid fa-clock fs-5" style="color: #005452;"></i>
+                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom gap-2" style="flex-wrap: nowrap;">
+                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center flex-shrink-0" style="background: rgba(0, 84, 82, 0.1); width: 34px; height: 34px;">
+                                    <i class="fa-solid fa-clock" style="color: #005452; font-size: 15px;"></i>
                                 </div>
-                                <div>
-                                    <h6 class="report-card-heading">Total Learning Time</h6>
-                                    <small class="text-muted">Course duration and access records</small>
+                                <div style="min-width: 0;">
+                                    <h6 class="report-card-heading text-truncate mb-0" style="font-size: 13px; font-weight: 600;">Total Learning Time</h6>
+                                    <small class="text-muted text-truncate d-block" style="font-size: 11px;">Course duration and access records</small>
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -2409,14 +2737,14 @@ foreach ($userAssignedForReports as $idx => $assign) {
                     <!-- Card 2: Assessments -->
                     <div class="col-12 col-md-6">
                         <div class="report-stat-card" data-assessment-options=\'' . $cOptionsJson . '\'>
-                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
-                                <div class="d-flex align-items-center">
-                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(0, 84, 82, 0.1); width: 38px; height: 38px;">
-                                        <i class="fa-solid fa-chart-line fs-5" style="color: #005452;"></i>
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom gap-2" style="flex-wrap: nowrap;">
+                                <div class="d-flex align-items-center me-2" style="min-width: 0; flex: 1 1 auto;">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center flex-shrink-0" style="background: rgba(0, 84, 82, 0.1); width: 34px; height: 34px;">
+                                        <i class="fa-solid fa-chart-line" style="color: #005452; font-size: 15px;"></i>
                                     </div>
-                                    <div>
-                                        <h6 class="report-card-heading">Assessments</h6>
-                                        <small class="text-muted">Attempts and score summary</small>
+                                    <div style="min-width: 0;">
+                                        <h6 class="report-card-heading text-truncate mb-0" style="font-size: 13px; font-weight: 600;">Assessments</h6>
+                                        <small class="text-muted text-truncate d-block" style="font-size: 11px;">Attempts and score summary</small>
                                     </div>
                                 </div>
                                 ' . $cDropdownHtml . '
@@ -2430,7 +2758,7 @@ foreach ($userAssignedForReports as $idx => $assign) {
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
-                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="report-label mb-1">Result</div>
                                         <div class="mt-1 report-stat-badge">' . $cCardBadge . '</div>
                                     </div>
                                 </div>
@@ -2451,6 +2779,387 @@ foreach ($userAssignedForReports as $idx => $assign) {
             </div>
         </div>
     </div>';
+
+            // Sub-courses detailed report cards belonging to this main course
+            if (empty($cDetails->parent_id)) {
+                $subCoursesForReports = Courses::where('parent_id', $cDetails->id)
+                    ->where('is_delete', 0)
+                    ->with('category_details')
+                    ->get();
+
+                foreach ($subCoursesForReports as $subCourse) {
+                    $subCourseId = $subCourse->id;
+                    $subDocIds = Course_documents::where('course_id', $subCourseId)
+                        ->where('type', 6)
+                        ->where('is_delete', 0)
+                        ->pluck('id');
+
+                    $subAssessmentResults = Assessment_results::where('user_id', $user->id)
+                        ->whereIn('course_document_id', $subDocIds)
+                        ->whereNull('deleted_at')
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    $subExamAttempts = ExamAttempt::where('user_id', $user->id)
+                        ->where('course_id', $subCourseId)
+                        ->where(function ($q) use ($subCourseId, $assign) {
+                            $subAssign = AsignedUser::where('user_id', $assign->user_id)->where('course_id', $subCourseId)->first();
+                            if ($subAssign) {
+                                $q->where('assigned_id', $subAssign->id)
+                                  ->orWhereNull('assigned_id');
+                            } else {
+                                $q->where('assigned_id', $assign->id)
+                                  ->orWhereNull('assigned_id');
+                            }
+                        })
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    $subSeconds = 0;
+                    foreach ($subAssessmentResults as $res) {
+                        $sec = 0;
+                        if (!empty($res->total_time_taken) && is_numeric($res->total_time_taken)) {
+                            $sec = (int)$res->total_time_taken;
+                        } elseif (!empty($res->completed_at) && !empty($res->created_at)) {
+                            $tComp = $parseTimestamp($res->completed_at);
+                            $tCreate = $parseTimestamp($res->created_at);
+                            $sec = ($tComp && $tCreate) ? max(0, abs($tComp->timestamp - $tCreate->timestamp)) : 0;
+                        }
+                        $subSeconds += $sec;
+                    }
+                    foreach ($subExamAttempts as $att) {
+                        if (!empty($att->total_time) && is_numeric($att->total_time)) {
+                            $subSeconds += ((int)$att->total_time) * 60;
+                        }
+                    }
+                    $overallTotalSeconds += $subSeconds;
+
+                    if ($subSeconds >= 3600) {
+                        $hrs = floor($subSeconds / 3600);
+                        $mins = floor(($subSeconds % 3600) / 60);
+                        $subTotalTimeFormatted = $hrs . ' hr ' . $mins . ' min';
+                    } elseif ($subSeconds >= 60) {
+                        $mins = floor($subSeconds / 60);
+                        $secs = $subSeconds % 60;
+                        $subTotalTimeFormatted = $mins . ' min' . ($secs > 0 ? ' ' . $secs . ' sec' : '');
+                    } elseif ($subSeconds > 0) {
+                        $subTotalTimeFormatted = $subSeconds . ' sec';
+                    } else {
+                        $subTotalTimeFormatted = '0 min';
+                    }
+
+                    $subAllDates = [];
+                    foreach ($subAssessmentResults as $res) {
+                        if ($d1 = $parseTimestamp($res->created_at)) $subAllDates[] = $d1;
+                        if ($d2 = $parseTimestamp($res->completed_at)) $subAllDates[] = $d2;
+                    }
+                    foreach ($subExamAttempts as $att) {
+                        if ($d1 = $parseTimestamp($att->created_at)) $subAllDates[] = $d1;
+                        $evalDate = $att->evaluation_completed_date ?? $att->updated_at;
+                        if ($d2 = $parseTimestamp($evalDate)) $subAllDates[] = $d2;
+                    }
+
+                    if (!empty($subAllDates)) {
+                        usort($subAllDates, function($a, $b) {
+                            return $a->timestamp <=> $b->timestamp;
+                        });
+                        $subFirstAccessed = $subAllDates[0]->format('d M Y, h:i A');
+                        $subLastAccessed = end($subAllDates)->format('d M Y, h:i A');
+                    } else {
+                        $subFirstAccessed = 'Not Yet Accessed';
+                        $subLastAccessed = 'Not Yet Accessed';
+                    }
+
+                    $rawSubAttempts = $subAssessmentResults->count() + $subExamAttempts->count();
+                    $subAttempts = min(3, $rawSubAttempts);
+                    $overallAttemptCount += $subAttempts;
+
+                    $subLatestAssessmentResults = $subAssessmentResults->count() > 3 ? $subAssessmentResults->slice(-3)->values() : $subAssessmentResults;
+                    $subLatestExamAttempts = $subExamAttempts->count() > 3 ? $subExamAttempts->slice(-3)->values() : $subExamAttempts;
+
+                    $subActiveAssessments = Course_documents::where('course_id', $subCourseId)
+                        ->where('type', 6)
+                        ->where('is_delete', 0)
+                        ->where(function ($q) {
+                            $q->where('is_active', 1)->orWhereNull('is_active');
+                        })
+                        ->get();
+
+                    $subActiveAssignments = Course_documents::where('course_id', $subCourseId)
+                        ->where('type', 7)
+                        ->where('is_delete', 0)
+                        ->where(function ($q) {
+                            $q->where('is_active', 1)->orWhereNull('is_active');
+                        })
+                        ->get();
+
+                    $subHasAssess = $subActiveAssessments->isNotEmpty();
+                    $subHasAssign = $subActiveAssignments->isNotEmpty();
+
+                    $subHasPassed = false;
+                    if ($subHasAssess || $subHasAssign) {
+                        $allAssessPassed = true;
+                        if ($subHasAssess) {
+                            foreach ($subActiveAssessments as $assess) {
+                                $passed = $subAssessmentResults->where('course_document_id', $assess->id)->contains(function($res) {
+                                    if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
+                                        return true;
+                                    }
+                                    $payload = json_decode($res->result_data ?? '', true);
+                                    $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+                                    $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                                    return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+                                });
+                                if (!$passed) {
+                                    $allAssessPassed = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $allAssignPassed = true;
+                        if ($subHasAssign) {
+                            $uniqueExamCodes = $subActiveAssignments->pluck('file_path')->filter()->unique();
+                            if ($uniqueExamCodes->isEmpty()) {
+                                $allAssignPassed = false;
+                            } else {
+                                foreach ($uniqueExamCodes as $examCode) {
+                                    $exam = Exam::where('exam_code', $examCode)->first();
+                                    if (!$exam) {
+                                        $allAssignPassed = false;
+                                        break;
+                                    }
+                                    $passed = $subExamAttempts->where('exam_id', $exam->id)->contains(function($att) {
+                                        return strtolower(trim($att->exam_result ?? '')) === 'passed';
+                                    });
+                                    if (!$passed) {
+                                        $allAssignPassed = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        $subHasPassed = ($subHasAssess ? $allAssessPassed : true) && ($subHasAssign ? $allAssignPassed : true);
+                    }
+
+                    if ($subHasPassed) {
+                        $overallPassedCourses++;
+                        $subBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+                    } elseif ($subAttempts > 0) {
+                        $subBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+                    } else {
+                        $subBadge = '<span class="report-badge-neutral">Not Attempted</span>';
+                    }
+
+                    $subScores = [];
+                    foreach ($subLatestAssessmentResults as $res) {
+                        $payload = json_decode($res->result_data ?? '', true);
+                        $details = $payload['results'] ?? json_decode($res->results ?? '', true);
+                        if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                            $score = round((float)$details['percentage'], 1);
+                            $subScores[] = $score;
+                            $overallScores[] = $score;
+                        }
+                    }
+
+                    foreach ($subLatestExamAttempts as $att) {
+                        if (isset($att->percentage) && is_numeric($att->percentage)) {
+                            $score = round((float)$att->percentage, 1);
+                            $subScores[] = $score;
+                            $overallScores[] = $score;
+                        }
+                    }
+
+                    $subHighest = !empty($subScores) ? max($subScores) . '%' : '-';
+                    $subLowest = !empty($subScores) ? min($subScores) . '%' : '-';
+
+                    $subAssessmentOptions = [];
+                    $subAssessmentOptionsMap = [];
+
+                    foreach ($subActiveAssessments as $assessIdx => $assess) {
+                        $aRes = $subAssessmentResults->where('course_document_id', $assess->id);
+                        $aCount = min(3, $aRes->count());
+                        $aIsPassed = $aRes->contains(function($r) {
+                            if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
+                            $payload = json_decode($r->result_data ?? '', true);
+                            $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                            $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
+                            return ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff']));
+                        });
+
+                        $aScores = [];
+                        $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+                        foreach ($aLatest as $r) {
+                            $payload = json_decode($r->result_data ?? '', true);
+                            $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                            if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                                $aScores[] = round((float)$details['percentage'], 1);
+                            }
+                        }
+                        if ($aIsPassed) {
+                            foreach ($aRes as $r) {
+                                $payload = json_decode($r->result_data ?? '', true);
+                                $details = $payload['results'] ?? json_decode($r->results ?? '', true);
+                                if (isset($details['percentage']) && is_numeric($details['percentage'])) {
+                                    $pScore = round((float)$details['percentage'], 1);
+                                    if (!in_array($pScore, $aScores)) $aScores[] = $pScore;
+                                }
+                            }
+                        }
+
+                        $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
+                        $aKey = 'assess_' . $assess->id;
+                        $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($assessIdx + 1));
+
+                        $optData = [
+                            'key' => $aKey,
+                            'name' => $aName,
+                            'type' => 'Assessment',
+                            'attempts' => $aCount,
+                            'status' => $aStatus,
+                            'highest_score' => !empty($aScores) ? max($aScores) . '%' : '-',
+                            'lowest_score' => !empty($aScores) ? min($aScores) . '%' : '-',
+                        ];
+                        $subAssessmentOptions[] = $optData;
+                        $subAssessmentOptionsMap[$aKey] = $optData;
+                    }
+
+                    $subFirstAssess = !empty($subAssessmentOptions) ? $subAssessmentOptions[0] : null;
+                    $subCardAttempts = $subFirstAssess ? $subFirstAssess['attempts'] : ($subHasAssess ? $subAttempts : 0);
+                    $subCardStatus = $subFirstAssess ? $subFirstAssess['status'] : ($subHasAssess ? ($subHasPassed ? 'Passed' : ($subAttempts > 0 ? 'Failed' : 'Not Attempted')) : 'No Assessment');
+                    $subCardHighest = $subFirstAssess ? $subFirstAssess['highest_score'] : ($subHasAssess ? $subHighest : '-');
+                    $subCardLowest = $subFirstAssess ? $subFirstAssess['lowest_score'] : ($subHasAssess ? $subLowest : '-');
+
+                    if ($subCardStatus === 'Passed') {
+                        $subCardBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
+                    } elseif ($subCardAttempts > 0) {
+                        $subCardBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
+                    } else {
+                        $subCardBadge = '<span class="report-badge-neutral">' . $subCardStatus . '</span>';
+                    }
+
+                    $subDropdownHtml = '';
+                    if (count($subAssessmentOptions) > 1) {
+                        $subDropdownHtml .= '<div class="ms-auto flex-shrink-0" style="max-width: 50%;">';
+                        $subDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 12px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px; width: 100%;">';
+                        foreach ($subAssessmentOptions as $idxOpt => $opt) {
+                            $selected = ($idxOpt === 0) ? 'selected' : '';
+                            $fullName = $opt['name'];
+                            $shortName = mb_strlen($fullName) > 22 ? mb_substr($fullName, 0, 20) . '...' : $fullName;
+                            $subDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" title="' . htmlspecialchars($fullName) . '" ' . $selected . '>' . htmlspecialchars($shortName) . '</option>';
+                        }
+                        $subDropdownHtml .= '</select></div>';
+                    }
+
+                    $subOptionsJson = htmlspecialchars(json_encode($subAssessmentOptionsMap), ENT_QUOTES, 'UTF-8');
+                    $subCollapseId = 'reportSubCourseCollapse_' . $subCourse->id . '_' . $assign->id;
+                    $subCatName = htmlspecialchars($subCourse->category_details->category_name ?? $catName);
+
+                    $coursesReportsCardsHtml .= '
+                    <div class="card mb-3 border rounded-3 shadow-sm bg-white overflow-hidden" style="border: 1px solid #e2e8f0 !important; margin-left: 20px; border-left: 4px solid #005452 !important;">
+                        <div class="card-header py-2.5 px-3 d-flex align-items-center justify-content-between cursor-pointer collapsed" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-wrap: nowrap; gap: 12px;" data-bs-toggle="collapse" data-bs-target="#' . $subCollapseId . '" aria-expanded="false" aria-controls="' . $subCollapseId . '">
+                            <div class="d-flex align-items-center me-2" style="min-width: 0; flex: 1 1 auto;">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 36px; height: 36px; background: rgba(0, 84, 82, 0.1); color: #005452;">
+                                    <i class="fa-solid fa-layer-group" style="font-size: 14px;"></i>
+                                </div>
+                                <div style="min-width: 0;">
+                                    <div class="d-flex align-items-center gap-2 mb-0">
+                                        <span class="badge flex-shrink-0" style="background-color: #005452; color: #fff; font-size: 10px; padding: 2px 7px; font-weight: 500;">Sub Course</span>
+                                        <span class="fw-bold text-dark text-truncate" style="font-size: 13px;">' . htmlspecialchars($subCourse->course_name) . '</span>
+                                    </div>
+                                    <div class="text-muted text-truncate mt-0" style="font-size: 8px; font-weight: normal; line-height: 1.35;">
+                                        <span>Parent Course: ' . htmlspecialchars($cDetails->course_name ?? 'N/A') . '</span>
+                                        <span class="mx-1">•</span>
+                                        <span>' . $subCatName . '</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-muted" style="width: 30px; height: 30px;">
+                                    <i class="fa-solid fa-chevron-down fs-7 chevron-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="' . $subCollapseId . '" class="collapse" data-bs-parent="#courseReportsAccordion">
+                            <div class="card-body p-3 bg-white">
+                                <div class="row g-3">
+                                    <!-- Card 1: Total Learning Time -->
+                                    <div class="col-12 col-md-6">
+                                        <div class="report-stat-card">
+                                            <div class="d-flex align-items-center mb-3 pb-2 border-bottom gap-2" style="flex-wrap: nowrap;">
+                                                <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center flex-shrink-0" style="background: rgba(0, 84, 82, 0.1); width: 34px; height: 34px;">
+                                                    <i class="fa-solid fa-clock" style="color: #005452; font-size: 15px;"></i>
+                                                </div>
+                                                <div style="min-width: 0;">
+                                                    <h6 class="report-card-heading text-truncate mb-0" style="font-size: 13px; font-weight: 600;">Total Learning Time</h6>
+                                                    <small class="text-muted text-truncate d-block" style="font-size: 11px;">Sub-course duration and access records</small>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <div class="report-label mb-1">Total time on sub course</div>
+                                                <div class="report-value-big" style="color: #005452;">' . $subTotalTimeFormatted . '</div>
+                                            </div>
+                                            <div class="pt-3 border-top">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <div class="report-label"><i class="fa-regular fa-calendar-check text-muted me-1"></i> First Accessed</div>
+                                                    <div class="report-value-text">' . $subFirstAccessed . '</div>
+                                                </div>
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <div class="report-label"><i class="fa-regular fa-calendar-days text-muted me-1"></i> Last Accessed</div>
+                                                    <div class="report-value-text">' . $subLastAccessed . '</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 2: Assessments -->
+                                    <div class="col-12 col-md-6">
+                                        <div class="report-stat-card" data-assessment-options=\'' . $subOptionsJson . '\'>
+                                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom gap-2" style="flex-wrap: nowrap;">
+                                                <div class="d-flex align-items-center me-2" style="min-width: 0; flex: 1 1 auto;">
+                                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center flex-shrink-0" style="background: rgba(0, 84, 82, 0.1); width: 34px; height: 34px;">
+                                                        <i class="fa-solid fa-chart-line" style="color: #005452; font-size: 15px;"></i>
+                                                    </div>
+                                                    <div style="min-width: 0;">
+                                                        <h6 class="report-card-heading text-truncate mb-0" style="font-size: 13px; font-weight: 600;">Assessments</h6>
+                                                        <small class="text-muted text-truncate d-block" style="font-size: 11px;">Attempts and score summary</small>
+                                                    </div>
+                                                </div>
+                                                ' . $subDropdownHtml . '
+                                            </div>
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-6">
+                                                    <div class="p-2 rounded bg-light border">
+                                                        <div class="report-label mb-1">No. of Attempts</div>
+                                                        <div class="report-value-big text-dark report-stat-attempts">' . $subCardAttempts . '</div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="p-2 rounded bg-light border">
+                                                        <div class="report-label mb-1">Result</div>
+                                                        <div class="mt-1 report-stat-badge">' . $subCardBadge . '</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 pt-2 border-top">
+                                                <div class="col-6">
+                                                    <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Highest Score</div>
+                                                    <div class="fs-5 fw-bold text-success report-stat-highest">' . $subCardHighest . '</div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="report-label mb-1"><i class="fa-solid fa-arrow-trend-down text-danger me-1"></i> Lowest Score</div>
+                                                    <div class="fs-5 fw-bold text-secondary report-stat-lowest">' . $subCardLowest . '</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                }
+            }
 }
 
 // Overall summary header

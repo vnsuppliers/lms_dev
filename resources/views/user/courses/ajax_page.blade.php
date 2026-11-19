@@ -198,8 +198,16 @@
                 @endif
             </div>
             <div class="ms-2 ms-lg-3">
-                <div class="mb-1 course-name font-weight-bold">{{$courses_data->course_details->course_name??''}}</div>
-                <div class="fs-7 my-course-categori-name py-1">
+                <div class="mb-1 course-name font-weight-bold">
+                    @if(!empty($courses_data->course_details->parent_id))
+                        <span class="badge me-1" style="background:#005452; color:#fff; font-size:10px; font-weight:500; padding:2px 6px; border-radius:3px;">Sub Course</span>
+                    @endif
+                    {{$courses_data->course_details->course_name??''}}
+                    @if(!empty($courses_data->course_details->parent_course))
+                        <small class="text-muted ms-1" style="font-size:12px; font-weight:normal;">(Parent Course: {{ $courses_data->course_details->parent_course->course_name }})</small>
+                    @endif
+                </div>
+                <div class="fs-7 my-course-categori-name py-1 d-flex align-items-center flex-wrap">
                     <span class="dashed-border-category-icon"><i class="fa-solid fa-folder-tree"></i></span>
                     <span class="ps-1">{{$courses_data->course_details->category_details->category_name??''}}</span>
                 </div>
@@ -384,7 +392,7 @@
                                         </div>
                                         <div class="pl-3">
                                            
-                                            <div><a href="{{url('start_course')}}?id={{$courses_data->id}}"><h6 class="mb-0 darkk-theme-text">{{$attachment->file_name??''}}</h6></a></div>
+                                            <div><a href="{{url('start_course')}}?id={{$courses_data->id}}@if(!empty($courses_data->course_details->parent_id))&course_id={{$courses_data->course_details->id}}@endif"><h6 class="mb-0 darkk-theme-text">{{$attachment->file_name??''}}</h6></a></div>
                                             
                                         </div>
                                     </div>
@@ -590,11 +598,14 @@
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
-                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="report-label mb-1">Result</div>
                                         <div class="mt-1 report-stat-badge">
-                                            @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
+                                            @php
+                                                $passedInVal = strtolower(trim($reportData['passed_in'] ?? ''));
+                                            @endphp
+                                            @if($passedInVal === 'passed' || str_starts_with($passedInVal, 'passed'))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
-                                            @elseif(($reportData['passed_in'] ?? '') === 'Failed')
+                                            @elseif($passedInVal === 'failed' || str_starts_with($passedInVal, 'failed'))
                                                 <span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>
                                             @else
                                                 <span class="report-badge-neutral">{{ $reportData['passed_in'] ?? 'Not Attempted' }}</span>
@@ -784,11 +795,14 @@
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
-                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="report-label mb-1">Result</div>
                                         <div class="mt-1 report-stat-badge">
-                                            @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
+                                            @php
+                                                $passedInVal = strtolower(trim($reportData['passed_in'] ?? ''));
+                                            @endphp
+                                            @if($passedInVal === 'passed' || str_starts_with($passedInVal, 'passed'))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
-                                            @elseif(($reportData['passed_in'] ?? '') === 'Failed')
+                                            @elseif($passedInVal === 'failed' || str_starts_with($passedInVal, 'failed'))
                                                 <span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>
                                             @else
                                                 <span class="report-badge-neutral">{{ $reportData['passed_in'] ?? 'Not Attempted' }}</span>

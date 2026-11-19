@@ -791,7 +791,7 @@
                                                                     </div>
                                                                     <div class="col-8 col-lg-9 col-lg-10p5 ps-0 ps-lg-0 mt-1 mt-lg-2 mb-0 my-lg-auto">
                                                                         <div>
-                                                                            <a href="javascript:;" class="course-name font-weight-bold">{{$recent->course_data->course_name??''}}</a>
+                                                                            <span class="course-name font-weight-bold" style="text-decoration: none !important; cursor: default;">{{$recent->course_data->course_name??''}}</span>
                                                                         </div>
                                                                         <div class="py-1 sub-categories-styles d-none d-md-block">
                                                                             <small class="d-flex justify-content-start align-items-center">

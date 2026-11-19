@@ -87,15 +87,21 @@ class Asigneduser extends Model
             return false;
         }
 
+        $courseIds = [$courseId];
+        $subCourseIds = Courses::where('parent_id', $courseId)->where('active', 1)->where('is_delete', 0)->pluck('id')->toArray();
+        if (!empty($subCourseIds)) {
+            $courseIds = array_merge($courseIds, $subCourseIds);
+        }
+
         // 1. Active Assessments (type 6)
-        $activeAssessments = Course_documents::where('course_id', $courseId)
+        $activeAssessments = Course_documents::whereIn('course_id', $courseIds)
             ->where('type', 6)
             ->where('is_delete', 0)
             ->where('is_active', 1)
             ->get();
 
         // 2. Active Assignments (type 7)
-        $activeAssignments = Course_documents::where('course_id', $courseId)
+        $activeAssignments = Course_documents::whereIn('course_id', $courseIds)
             ->where('type', 7)
             ->where('is_delete', 0)
             ->where(function ($q) {
@@ -139,11 +145,11 @@ class Asigneduser extends Model
                 }
 
                 $passed = ExamAttempt::where('exam_id', $exam->id)
-                    ->where(function ($q) {
+                    ->where(function ($q) use ($courseIds) {
                         $q->where('assigned_id', $this->id)
-                          ->orWhere(function ($sub) {
+                          ->orWhere(function ($sub) use ($courseIds) {
                               $sub->where('user_id', $this->user_id)
-                                  ->where('course_id', $this->course_id);
+                                  ->whereIn('course_id', $courseIds);
                           });
                     })
                     ->whereRaw('LOWER(exam_result) = ?', ['passed'])

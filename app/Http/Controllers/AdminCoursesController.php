@@ -81,6 +81,32 @@ class AdminCoursesController extends Controller
 
         $courseData = $request->except(['_token','documents','save_as_draft','content_type']);
 
+        // Handle sub-course parent linkage
+        if ($request->filled('parent_course_id') && empty($courseData['parent_id'])) {
+            $courseData['parent_id'] = $request->parent_course_id;
+        }
+
+        if (!empty($courseData['parent_id'])) {
+            $parentCourse = Courses::find($courseData['parent_id']);
+            if ($parentCourse) {
+                if (empty($courseData['category_id'])) {
+                    $courseData['category_id'] = $parentCourse->category_id;
+                }
+                if (empty($courseData['subcategory_id'])) {
+                    $courseData['subcategory_id'] = $parentCourse->subcategory_id;
+                }
+                if (empty($courseData['certificate'])) {
+                    $courseData['certificate'] = $parentCourse->certificate;
+                }
+            }
+            if (empty($courseData['order_no'])) {
+                $maxOrder = Courses::where('parent_id', $courseData['parent_id'])->max('order_no');
+                $courseData['order_no'] = ($maxOrder !== null) ? $maxOrder + 1 : 1;
+            }
+        } else {
+            $courseData['parent_id'] = null;
+        }
+
         // Auto-assign certificate from category if certificate is empty or not provided
         if (empty($courseData['certificate']) && !empty($courseData['category_id'])) {
             $categoryHierarchy = [];
@@ -475,7 +501,12 @@ public function reassignAssessmentToAll(Request $request)
             ->unique()
             ->values();
 
-        $affectedAssignments = AsignedUser::where('course_id', $assessment->course_id)
+        $courseIdsToFind = [$assessment->course_id];
+        if ($course && !empty($course->parent_id)) {
+            $courseIdsToFind[] = $course->parent_id;
+        }
+
+        $affectedAssignments = AsignedUser::whereIn('course_id', $courseIdsToFind)
             ->whereIn('user_id', $attemptedUserIds)
             ->get();
         $affectedAssignmentIds = $affectedAssignments->pluck('id');
@@ -516,8 +547,18 @@ public function delete_admin_courses(Request $request) {
 }
 
 public function fetch_course_details(Request $request) {
+    $active_tab = $request->input('active_tab', $request->input('tab', 'about-course'));
 
-    $course = Courses::findOrFail($request->course_id);
+    $course = Courses::with([
+        'sub_courses' => function ($q) {
+            $q->withCount(['documents_details', 'assessments', 'other_videos', 'only_scorm', 'only_attachments'])
+              ->with(['assessments', 'documents_details', 'assignment_exam.assignment_exam_name']);
+        },
+        'parent_course',
+        'assessments',
+        'documents_details',
+        'assignment_exam.assignment_exam_name'
+    ])->findOrFail($request->course_id);
 
     $course_category_id = $course->category_id;
 
@@ -583,7 +624,7 @@ public function fetch_course_details(Request $request) {
             //dd($groups_lists);
 
     //dd($course);
-    $html = view('admin.coursecatalog.course_ajax',compact('course','users_lists','assignedUser','notattend','notresponce','attend','departments','designations','request','completed_course','groups_lists','category_department','roles','reportAssessmentResults'))->render();
+    $html = view('admin.coursecatalog.course_ajax',compact('course','users_lists','assignedUser','notattend','notresponce','attend','departments','designations','request','completed_course','groups_lists','category_department','roles','reportAssessmentResults','active_tab'))->render();
     return $html;
 }
 
@@ -595,6 +636,7 @@ public function search_courses_ajax(Request $request)
     }
 
     $query = Courses::with(['category_details.department', 'Assigned_usersdetails'])
+        ->whereNull('parent_id')
         ->where('is_delete', 0);
 
     // Filter by active status if specified
@@ -1263,10 +1305,26 @@ public function toggleDocumentStatus(Request $request)
         $course_id = Courses::where('id', $request->id)->first();
         
         if(!$course_id) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'No course exist'], 404);
+            }
             return back()->with('error', 'No course exist');
         }
 
+        $parentId = $course_id->parent_id;
         $course_id->delete();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Sub course deleted successfully',
+                'parent_id' => $parentId
+            ]);
+        }
+
+        if (!empty($parentId)) {
+            return redirect('coursecatalog?tab=2&course_id=' . $parentId . '&subtab=sub-courses')->with('success', 'Sub course deleted successfully');
+        }
 
         return back()->with('success', 'Course deleted successfully');
 

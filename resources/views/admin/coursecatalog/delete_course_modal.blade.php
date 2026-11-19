@@ -1,6 +1,6 @@
 <div class="modal fade" id="deleteCourseModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog" role="document">
-        <form method="POST" action="{{ url('delete_course') }}">
+        <form method="POST" action="{{ url('delete_course') }}" id="delete_course_form">
             @csrf
             <div class="modal-content">
                 <div class="modal-header">
@@ -11,8 +11,8 @@
                     <input type="hidden" name="id" id="courseId">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">Delete</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="delete_course_submit_btn">Delete</button>
                 </div>
             </div>
         </form>

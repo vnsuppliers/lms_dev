@@ -148,356 +148,698 @@
         <div class="col-12 px-0">
 
             <div class="col-12 mt-1">
-                 @foreach ($assessments as $key => $data)
+                @php
+                    $parentCourseIdsInAssessments = $parentCourseIdsInAssessments ?? [];
+                    $userAssignedSubcourses = $userAssignedSubcourses ?? collect();
+                    $assessmentBaseUrl = config('app.assessment_url', env('ASSESSMENT_URL', 'https://assessment.digicat.ai'));
+                @endphp
 
-                            <div class="border px-2 py-2 py-md-2 py-lg-3">
+                @foreach ($assessments as $key => $data)
+                    @php
+                        $courseDetails = $data->course_details;
+                        if (!$courseDetails) continue;
 
-                                <div class="accordion accordion-flush"
-                                    id="accordionFlushExample{{ $key }}">
+                        if (!empty($courseDetails->parent_id) && in_array($courseDetails->parent_id, $parentCourseIdsInAssessments)) {
+                            continue;
+                        }
 
-                                    <div class="accordion-item">
+                        $subCourses = $courseDetails->sub_courses ?? collect();
+                        $hasSubCourses = $subCourses->isNotEmpty();
+                        $isStandaloneSub = !empty($courseDetails->parent_id);
+                        $cardBorderLeft = $hasSubCourses ? 'border-left: 4px solid #005452 !important;' : '';
+                    @endphp
 
-                                        <h2 class="accordion-header"
-                                            id="flush-headingOne{{ $key }}">
+                    <div class="border px-2 py-2 py-md-2 py-lg-3 {{ $hasSubCourses ? 'mb-0' : 'mb-3' }}" style="{{ $cardBorderLeft }}">
+                        <div class="accordion accordion-flush" id="accordionFlushExample{{ $key }}">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="flush-headingOne{{ $key }}">
+                                    <div class="row p-2 px-lg-0 align-items-center">
+                                        <div class="col-12 col-lg-7 my-auto">
+                                            <div class="d-flex align-items-center">
+                                                <div class="course-image-sm">
+                                                    <img src="{{ url('public/images/course.jpg') }}" class="img-fluid w-100 rounded-3" alt="">
+                                                </div>
+                                                <div class="ps-2">
+                                                    <div class="pb-1 course-name font-weight-bold">
+                                                        @if($isStandaloneSub)
+                                                            <span class="badge me-1" style="background:#005452; color:#fff; font-size:10px; font-weight:500; padding:2px 6px; border-radius:3px;">Sub Course</span>
+                                                        @endif
+                                                        {{ $courseDetails->course_name ?? 'Course Not Found' }}
+                                                        @if($isStandaloneSub && !empty($courseDetails->parent_course))
+                                                            <span class="text-muted ms-1" style="font-size: 12px; font-weight: normal; font-family: inherit;">(Parent Course: {{ $courseDetails->parent_course->course_name }})</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="py-1 sub-categories-styles">
+                                                        Online Training
+                                                    </div>
+                                                    <div class="py-1 sub-text">
+                                                        {{ optional($courseDetails->category_details)->category_name ?? 'Category Name' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-lg-5 d-flex justify-content-end mt-2 mt-lg-0">
+                                            <button class="accordion-button collapsed myteam-course-toggle-btn"
+                                                type="button"
+                                                data-assign-id="{{ $data->id }}"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#flush-collapse{{ $key }}"
+                                                aria-expanded="false"
+                                                aria-controls="flush-collapse{{ $key }}">
+                                                View Assessments & Assignments
+                                            </button>
+                                        </div>
+                                    </div>
+                                </h2>
 
-                                            <div class="row p-2 px-lg-0 align-items-center">
+                                <div id="flush-collapse{{ $key }}"
+                                    class="accordion-collapse collapse myteam-course-collapse"
+                                    data-assign-id="{{ $data->id }}"
+                                    aria-labelledby="flush-headingOne{{ $key }}"
+                                    data-bs-parent="#accordionFlushExample{{ $key }}">
+                                    <div class="accordion-body p-3 bg-white">
+                                        {{-- ASSESSMENTS SECTION --}}
+                                        <div class="card border rounded-3 shadow-sm bg-white mb-3 overflow-hidden">
+                                            <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge me-2" style="background: rgba(0, 84, 82, 0.12); color: #005452; font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                                        <i class="fa-solid fa-file-pen me-1"></i> Assessments
+                                                    </span>
+                                                    <span class="fw-semibold text-dark" style="font-size: 13px;">Course Assessments</span>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-3">
+                                                @php
+                                                    $validAssessments = ($courseDetails->assessments ?? collect())
+                                                        ->where('is_delete', 0)
+                                                        ->filter(fn($a) => !empty($a->file_name))
+                                                        ->unique('id');
+                                                @endphp
 
-                                                <div class="col-12 col-lg-7 my-auto">
+                                                @forelse ($validAssessments as $assess)
+                                                    @php
+                                                        $assessAttempts = collect();
+                                                        if (isset($allResults)) {
+                                                            $rawAttempts = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
+                                                                ? $allResults->get($assess->id)
+                                                                : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
 
-                                                    <div class="d-flex align-items-center">
+                                                            if ($rawAttempts instanceof \Illuminate\Support\Collection) {
+                                                                $assessAttempts = $rawAttempts;
+                                                            } elseif ($rawAttempts instanceof \App\Models\Assessment_results) {
+                                                                $assessAttempts = collect([$rawAttempts]);
+                                                            } elseif (is_array($rawAttempts)) {
+                                                                $assessAttempts = collect($rawAttempts);
+                                                            }
+                                                        }
 
-                                                        <div class="course-image-sm">
-                                                            <img src="{{ url('public/images/course.jpg') }}"
-                                                                class="img-fluid w-100 rounded-3"
-                                                                alt="">
+                                                        $assignAttempts = $assessAttempts->where('assign_id', $data->id);
+                                                        $attemptsToUse = $assignAttempts->isNotEmpty() ? $assignAttempts : $assessAttempts;
+
+                                                        $passedAttempt = $attemptsToUse->first(function($a) {
+                                                            if (!$a) return false;
+                                                            if (method_exists($a, 'hasPassed')) {
+                                                                return $a->hasPassed();
+                                                            }
+                                                            $payload = json_decode($a->result_data ?? '', true);
+                                                            $details = $payload['results'] ?? json_decode($a->results ?? '', true);
+                                                            if (!is_array($details)) return false;
+                                                            $status = strtolower(trim((string) ($details['pass_or_fail'] ?? '')));
+                                                            if ($status !== '') return $status === 'passed';
+                                                            return isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'];
+                                                        });
+
+                                                        $latestAttempt = $attemptsToUse->first();
+
+                                                        $result_html = '';
+                                                        $result_badge = '';
+                                                        $assessmentStatus = 'Not Attempted';
+
+                                                        if ($passedAttempt) {
+                                                            $assessmentStatus = 'Passed';
+                                                            $link = explode('/', $assess->file_path ?? '');
+                                                            $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($passedAttempt->code ?? '');
+                                                            $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $data->id);
+                                                            $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $data->id . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-primary text-nowrap take_result exam-result-btn">View Result</a>';
+                                                            $result_badge = '<span class="badge bg-success ms-2">Completed</span>';
+                                                        } elseif ($latestAttempt) {
+                                                            $assessmentStatus = 'Failed';
+                                                            $link = explode('/', $assess->file_path ?? '');
+                                                            $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($latestAttempt->code ?? '');
+                                                            $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $data->id);
+                                                            $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $data->id . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-outline-danger text-nowrap take_result exam-result-btn">View Result</a>';
+                                                            $result_badge = '<span class="badge bg-danger ms-2">Failed</span>';
+                                                        } else {
+                                                            if ($data->status == 1) {
+                                                                $assessmentStatus = 'In Progress';
+                                                            } elseif ($data->status == 2) {
+                                                                $assessmentStatus = 'Not Attended';
+                                                            } elseif ($data->status == 0) {
+                                                                $assessmentStatus = 'Pending';
+                                                            } else {
+                                                                $assessmentStatus = 'Not Attempted';
+                                                            }
+                                                        }
+                                                    @endphp
+
+                                                    <div class="row mt-2 mb-3">
+                                                        <div class="col-12">
+                                                            <div class="exam-result-block">
+                                                                <div>
+                                                                    <div class="border-left-3p-b1 ps-2">Assessment Name</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="ml-0 w-100 oneline-text-truncate">
+                                                                            {{ $assess->file_name }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="result-styles ml-0">
+                                                                            {{ $assessmentStatus }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b3 ps-2">Action</div>
+                                                                    <div class="r-data-styles white-space-nowrap">
+                                                                        @if(!empty($result_html))
+                                                                            <span class="ml-0">{!! $result_html !!}</span>
+                                                                            {!! $result_badge !!}
+                                                                        @else
+                                                                            <span class="text-muted small">Not Attempted Yet</span>
+                                                                        @endif
+
+                                                                        @if($data->status == 3 || $assessmentStatus == 'Passed')
+                                                                            <a href="#"
+                                                                                data-id="{{ $data->id }}"
+                                                                                class="btn btn-primary btn-sm get_certificates exam-result-btn ms-2"
+                                                                                data-bs-toggle="modal"
+                                                                                data-bs-target="#certificateView">
+                                                                                View Certificate
+                                                                            </a>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
+                                                    </div>
+                                                @empty
+                                                    <div class="text-center py-2 text-muted small">
+                                                        No assessments found for this course.
+                                                    </div>
+                                                @endforelse
+                                            </div>
+                                        </div>
 
-                                                        <div class="ps-2">
+                                        {{-- ASSIGNMENTS SECTION --}}
+                                        <div class="card border rounded-3 shadow-sm bg-white mb-0 overflow-hidden">
+                                            <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge me-2" style="background: rgba(13, 110, 253, 0.12); color: #0d6efd; font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                                        <i class="fa-solid fa-clipboard-check me-1"></i> Assignments
+                                                    </span>
+                                                    <span class="fw-semibold text-dark" style="font-size: 13px;">Course Assignments</span>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-3">
+                                                @php
+                                                    $validAssignments = ($courseDetails->assignment_exam ?? collect())->unique(function ($assignment_exam) {
+                                                        return optional($assignment_exam->assignment_exam_name)->id;
+                                                    });
+                                                @endphp
 
-                                                        <a href="#" class="pb-1 course-name font-weight-bold">{{ optional($data->course_details)->course_name ?? 'Course Not Found' }}</a>
+                                                @forelse($validAssignments as $assignment_exam)
+                                                    @php
+                                                        $examId = optional($assignment_exam->assignment_exam_name)->id;
+                                                        $courseId = $courseDetails->id ?? null;
+                                                        $examKey = $examId . '_' . $courseId;
 
+                                                        $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
+
+                                                        $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
+                                                            $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
+                                                            $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
+                                                            $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
+
+                                                            return $pct >= 50;
+                                                        }) ?? $attemptsCollection->sortByDesc('id')->first();
+
+                                                        $assignedAnswerCount = 0;
+                                                        $assignedQuestionMarksCount = 0;
+                                                        $percentage = 0;
+                                                        $passPercentage = 50;
+                                                        $examStatus = 'Pending';
+
+                                                        if ($assignedExam) {
+                                                            $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
+                                                            $assignedQuestionMarksCount = (float) ($allQuestionMarks[$assignedExam->exam_id] ?? 0);
+
+                                                            if ($assignedQuestionMarksCount > 0) {
+                                                                $percentage = round(
+                                                                    ($assignedAnswerCount / $assignedQuestionMarksCount) * 100,
+                                                                    2
+                                                                );
+                                                            }
+
+                                                            if (
+                                                                isset($assignedExam->exam_result) &&
+                                                                $assignedExam->exam_result == 'Pending'
+                                                            ) {
+                                                                $examStatus = 'Pending';
+                                                            } elseif ($percentage >= $passPercentage) {
+                                                                $examStatus = 'Passed';
+                                                            } else {
+                                                                $examStatus = 'Failed';
+                                                            }
+                                                        }
+                                                    @endphp
+
+                                                    <div class="row mt-2 mb-3">
+                                                        <div class="col-12">
+                                                            <div class="exam-result-block">
+                                                                <div>
+                                                                    <div class="border-left-3p-b1 ps-2">Assignment Name</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="ml-0 w-100 oneline-text-truncate">
+                                                                            {{ optional($assignment_exam->assignment_exam_name)->name ?? 'N/A' }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="result-styles ml-0">
+                                                                            {{ $examStatus }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b3 ps-2">Score</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="result-styles ml-0">
+                                                                            {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b4 ps-2">Percentage</div>
+                                                                    <div class="r-data-styles">
+                                                                        <span class="result-styles ml-0">
+                                                                            {{ number_format($percentage, 2) }}%
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                    <div class="border-left-3p-b5 ps-2">Action</div>
+                                                                    <div class="r-data-styles">
+                                                                        @if($assignedExam && isset($assignedExam->exam_result) && $assignedExam->exam_result == 'Pending')
+                                                                            <a href="{{ url('view_attempted_exam') }}?assigned_id={{ $data->id ?? '' }}&course_id={{ $courseId ?? '' }}&type=lead&exam_id={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                                class="btn btn-sm btn-outline-primary text-nowrap"
+                                                                                target="_blank">
+                                                                                Evaluate Exam
+                                                                            </a>
+                                                                        @elseif($assignedExam)
+                                                                            <a href="{{ route('exams.LeadResultview') }}?course_id={{ $courseId ?? '' }}&exam_name={{ optional($assignment_exam->assignment_exam_name)->exam_code ?? '' }}&ex_c={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                                class="btn btn-sm btn-primary text-nowrap exam-result-btn"
+                                                                                target="_blank">
+                                                                                Evaluation Completed
+                                                                            </a>
+
+                                                                            @if(!empty($assignedExam->evaluation_completed_date))
+                                                                                <p class="mb-0 mt-1">
+                                                                                    On : {{ \Carbon\Carbon::parse($assignedExam->evaluation_completed_date)->format('d-m-Y') }}
+                                                                                </p>
+                                                                            @endif
+                                                                        @else
+                                                                            <span class="text-muted small">Not Attempted</span>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @empty
+                                                    <div class="text-center py-2 text-muted small">
+                                                        No assignments found for this course.
+                                                    </div>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SUB-COURSES UNDER THIS PARENT COURSE --}}
+                    @if($hasSubCourses)
+                        @foreach($subCourses as $subKey => $subCourse)
+                            @php
+                                $subAssign = $userAssignedSubcourses[$subCourse->id] ?? null;
+                                $subAssignId = $subAssign ? $subAssign->id : $data->id;
+                                $subCourseStatus = $subAssign ? $subAssign->status : 0;
+                                $subCollapseId = 'subFlushCollapse_' . $key . '_' . $subKey . '_' . $subCourse->id;
+                            @endphp
+                            <div class="border px-2 py-2 py-md-2 py-lg-3 {{ $loop->last ? 'mb-3' : 'mb-0' }}" style="background-color: #f7faf9 !important; border-left: 4px solid #005452 !important; border-top: 1px dashed #b2cfcb !important; margin-left: 20px;">
+                                <div class="accordion accordion-flush" id="accordionFlushSub{{ $key }}_{{ $subKey }}">
+                                    <div class="accordion-item" style="background: transparent;">
+                                        <h2 class="accordion-header" id="flushHeadingSub{{ $key }}_{{ $subKey }}" style="font-size: inherit; font-weight: normal; margin-bottom: 0;">
+                                            <div class="row p-2 px-lg-0 align-items-center">
+                                                <div class="col-12 col-lg-7 my-auto">
+                                                    <div class="d-flex align-items-start">
+                                                        <div class="d-flex align-items-center flex-shrink-0 me-2" style="margin-top: 2px;">
+                                                            <span style="display: inline-block; width: 14px; height: 16px; border-left: 2px solid #005452; border-bottom: 2px solid #005452; border-bottom-left-radius: 4px; margin-right: 6px; margin-top: -6px;"></span>
+                                                            <div class="rounded-circle d-inline-flex align-items-center justify-content-center me-2 flex-shrink-0" style="width: 22px; height: 22px; background: rgba(0, 84, 82, 0.1); color: #005452;">
+                                                                <i class="fa-solid fa-code-branch" style="font-size: 11px;"></i>
+                                                            </div>
+                                                            <span class="badge" style="background-color: #005452; color: #fff; font-size: 11px; padding: 3px 8px; font-weight: 500;">Sub Course</span>
+                                                        </div>
+                                                        <div class="ps-1" style="min-width: 0;">
+                                                            <div class="pb-1" style="line-height: 20px;">
+                                                                <span class="course-name font-weight-bold d-inline" style="font-size: 14px; color: #212529;">{{ $subCourse->course_name }}</span>
+                                                                <span class="text-muted ms-1" style="font-size: 12px; font-weight: normal; font-family: inherit;">(Parent Course: {{ $courseDetails->course_name }})</span>
+                                                            </div>
                                                             <div class="py-1 sub-categories-styles">
                                                                 Online Training
                                                             </div>
-
                                                             <div class="py-1 sub-text">
-                                                                Category Name
+                                                                {{ optional($subCourse->category_details)->category_name ?? (optional($courseDetails->category_details)->category_name ?? 'Category Name') }}
                                                             </div>
-
                                                         </div>
-
                                                     </div>
-
                                                 </div>
-
                                                 <div class="col-12 col-lg-5 d-flex justify-content-end mt-2 mt-lg-0">
-
                                                     <button class="accordion-button collapsed myteam-course-toggle-btn"
                                                         type="button"
-                                                        data-assign-id="{{ $data->id }}"
+                                                        data-assign-id="{{ $subAssignId }}"
                                                         data-bs-toggle="collapse"
-                                                        data-bs-target="#flush-collapse{{ $key }}"
+                                                        data-bs-target="#{{ $subCollapseId }}"
                                                         aria-expanded="false"
-                                                        aria-controls="flush-collapse{{ $key }}">
-
+                                                        aria-controls="{{ $subCollapseId }}">
                                                         View Assessments & Assignments
-
                                                     </button>
-
                                                 </div>
-
                                             </div>
-
                                         </h2>
 
-
-                                        <div id="flush-collapse{{ $key }}"
+                                        <div id="{{ $subCollapseId }}"
                                             class="accordion-collapse collapse myteam-course-collapse"
-                                            data-assign-id="{{ $data->id }}"
-                                            aria-labelledby="flush-headingOne{{ $key }}"
-                                            data-bs-parent="#accordionFlushExample{{ $key }}">
+                                            data-assign-id="{{ $subAssignId }}"
+                                            aria-labelledby="flushHeadingSub{{ $key }}_{{ $subKey }}"
+                                            data-bs-parent="#accordionFlushSub{{ $key }}_{{ $subKey }}">
 
-                                            <div class="accordion-body p-0">
-
-
-                                            {{-- =====================================================
-                                                ASSESSMENTS
-                                            ====================================================== --}}
-                                            @php
-                                                $courseAssessments = optional($data->course_details)->assessments ?? collect();
-                                                
-                                                // Find assessment with result or fallback to first
-                                                $matchedAssessment = $courseAssessments->first(function($assess) use ($allResults) {
-                                                    if (!$allResults) return false;
-                                                    $res = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
-                                                        ? $allResults->get($assess->id)
-                                                        : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
-                                                    return !empty($res) && (!($res instanceof \Illuminate\Support\Collection) || $res->isNotEmpty());
-                                                });
-
-                                                if (!$matchedAssessment && $courseAssessments->isNotEmpty()) {
-                                                    $matchedAssessment = $courseAssessments->first();
-                                                }
-                                                
-                                                $validAssessments = $matchedAssessment ? collect([$matchedAssessment]) : collect();
-                                                $assessmentBaseUrl = config('app.assessment_url', env('ASSESSMENT_URL', 'https://assessment.digicat.ai'));
-                                            @endphp
-
-                                            @foreach ($validAssessments as $assess)
-                                                @php
-                                                    $assessAttempts = collect();
-                                                    if (isset($allResults)) {
-                                                        $rawAttempts = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
-                                                            ? $allResults->get($assess->id)
-                                                            : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
-                                                        
-                                                        if ($rawAttempts instanceof \Illuminate\Support\Collection) {
-                                                            $assessAttempts = $rawAttempts;
-                                                        } elseif ($rawAttempts instanceof \App\Models\Assessment_results) {
-                                                            $assessAttempts = collect([$rawAttempts]);
-                                                        } elseif (is_array($rawAttempts)) {
-                                                            $assessAttempts = collect($rawAttempts);
-                                                        }
-                                                    }
-
-                                                    // Match attempts specifically for this assignment if present, else fallback to user's assessment attempts
-                                                    $assignAttempts = $assessAttempts->where('assign_id', $data->id);
-                                                    $attemptsToUse = $assignAttempts->isNotEmpty() ? $assignAttempts : $assessAttempts;
-
-                                                    $passedAttempt = $attemptsToUse->first(function($a) {
-                                                        if (!$a) return false;
-                                                        if (method_exists($a, 'hasPassed')) {
-                                                            return $a->hasPassed();
-                                                        }
-                                                        $payload = json_decode($a->result_data ?? '', true);
-                                                        $details = $payload['results'] ?? json_decode($a->results ?? '', true);
-                                                        if (!is_array($details)) return false;
-                                                        $status = strtolower(trim((string) ($details['pass_or_fail'] ?? '')));
-                                                        if ($status !== '') return $status === 'passed';
-                                                        return isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'];
-                                                    });
-
-                                                    $latestAttempt = $attemptsToUse->first();
-
-                                                    $result_html = '';
-                                                    $result_badge = '';
-                                                    $assessmentStatus = 'Not Attempted';
-
-                                                    if ($passedAttempt) {
-                                                        $assessmentStatus = 'Passed';
-                                                        $link = explode('/', $assess->file_path ?? '');
-                                                        $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($passedAttempt->code ?? '');
-                                                        $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $data->id);
-                                                        $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $data->id . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-primary text-nowrap take_result exam-result-btn">View Result</a>';
-                                                        $result_badge = '<span class="badge bg-success ms-2">Completed</span>';
-                                                    } elseif ($latestAttempt) {
-                                                        $assessmentStatus = 'Failed';
-                                                        $link = explode('/', $assess->file_path ?? '');
-                                                        $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($latestAttempt->code ?? '');
-                                                        $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $data->id);
-                                                        $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $data->id . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-outline-danger text-nowrap take_result exam-result-btn">View Result</a>';
-                                                        $result_badge = '<span class="badge bg-danger ms-2">Failed</span>';
-                                                    } else {
-                                                        if ($data->status == 1) {
-                                                            $assessmentStatus = 'In Progress';
-                                                        } elseif ($data->status == 2) {
-                                                            $assessmentStatus = 'Not Attended';
-                                                        } elseif ($data->status == 0) {
-                                                            $assessmentStatus = 'Pending';
-                                                        } else {
-                                                            $assessmentStatus = 'Not Attempted';
-                                                        }
-                                                    }
-                                                @endphp
-
-                                                <div class="row mt-2 mb-3">
-                                                    <div class="col-12">
-                                                        <div class="exam-result-block">
-                                                            {{-- Assessment Name --}}
-                                                            <div>
-                                                                <div class="border-left-3p-b1 ps-2">Assessment Name</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="ml-0 w-100 oneline-text-truncate">
-                                                                        {{ $assess->file_name }}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            {{-- Status --}}
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b2 ps-2">Status</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="result-styles ml-0">
-                                                                        {{ $assessmentStatus }}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            {{-- Action --}}
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b3 ps-2">Action</div>
-                                                                <div class="r-data-styles white-space-nowrap">
-                                                                    @if(!empty($result_html))
-                                                                        <span class="ml-0">{!! $result_html !!}</span>
-                                                                        {!! $result_badge !!}
-                                                                    @else
-                                                                        <span class="text-muted small">Not Attempted Yet</span>
-                                                                    @endif
-
-                                                                    @if($data->status == 3 || $assessmentStatus == 'Passed')
-                                                                        <a href="#"
-                                                                            data-id="{{ $data->id }}"
-                                                                            class="btn btn-primary btn-sm get_certificates exam-result-btn ms-2"
-                                                                            data-bs-toggle="modal"
-                                                                            data-bs-target="#certificateView">
-                                                                            View Certificate
-                                                                        </a>
-                                                                    @endif
-                                                                </div>
-                                                            </div>
+                                            <div class="accordion-body p-3 bg-white border-top">
+                                                {{-- SUB-COURSE ASSESSMENTS SECTION --}}
+                                                <div class="card border rounded-3 shadow-sm bg-white mb-3 overflow-hidden">
+                                                    <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="badge me-2" style="background: rgba(0, 84, 82, 0.12); color: #005452; font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                                                <i class="fa-solid fa-file-pen me-1"></i> Assessments
+                                                            </span>
+                                                            <span class="fw-semibold text-dark" style="font-size: 13px;">Sub-Course Assessments</span>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            @endforeach
+                                                    <div class="card-body p-3">
+                                                        @php
+                                                            $validSubAssessments = ($subCourse->assessments ?? collect())
+                                                                ->where('is_delete', 0)
+                                                                ->filter(fn($a) => !empty($a->file_name))
+                                                                ->unique('id');
+                                                        @endphp
 
+                                                        @forelse ($validSubAssessments as $assess)
+                                                            @php
+                                                                $assessAttempts = collect();
+                                                                if (isset($allResults)) {
+                                                                    $rawAttempts = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
+                                                                        ? $allResults->get($assess->id)
+                                                                        : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
 
-                                            {{-- =====================================================
-                                                    ASSIGNMENTS / EXAMS
-                                            ====================================================== --}}
+                                                                    if ($rawAttempts instanceof \Illuminate\Support\Collection) {
+                                                                        $assessAttempts = $rawAttempts;
+                                                                    } elseif ($rawAttempts instanceof \App\Models\Assessment_results) {
+                                                                        $assessAttempts = collect([$rawAttempts]);
+                                                                    } elseif (is_array($rawAttempts)) {
+                                                                        $assessAttempts = collect($rawAttempts);
+                                                                    }
+                                                                }
 
-                                            {{-- =====================================================
-                                                ASSIGNMENTS / EXAMS (Supports Multiple Attempts)
-                                            ====================================================== --}}
-                                           @foreach(($data->course_details->assignment_exam ?? collect())->unique(function ($assignment_exam) {
-                                                return optional($assignment_exam->assignment_exam_name)->id;
-                                            }) as $assignment_exam)
-                                            
-                                                @php
-                                                    $examId = optional($assignment_exam->assignment_exam_name)->id;
-                                                    $courseId = $data->course_details->id ?? null;
-                                                    $examKey = $examId . '_' . $courseId;
-                                            
-                                                    $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
-                                            
-                                                    $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
-                                                        $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
-                                                        $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
-                                                        $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
-                                            
-                                                        return $pct >= 50;
-                                                    }) ?? $attemptsCollection->sortByDesc('id')->first();
-                                            
-                                                    $assignedAnswerCount = 0;
-                                                    $assignedQuestionMarksCount = 0;
-                                                    $percentage = 0;
-                                                    $passPercentage = 50;
-                                                    $examStatus = 'Pending';
-                                            
-                                                    if ($assignedExam) {
-                                                        $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
-                                                        $assignedQuestionMarksCount = (float) ($allQuestionMarks[$assignedExam->exam_id] ?? 0);
-                                            
-                                                        if ($assignedQuestionMarksCount > 0) {
-                                                            $percentage = round(
-                                                                ($assignedAnswerCount / $assignedQuestionMarksCount) * 100,
-                                                                2
-                                                            );
-                                                        }
-                                            
-                                                        if (
-                                                            isset($assignedExam->exam_result) &&
-                                                            $assignedExam->exam_result == 'Pending'
-                                                        ) {
-                                                            $examStatus = 'Pending';
-                                                        } elseif ($percentage >= $passPercentage) {
-                                                            $examStatus = 'Passed';
-                                                        } else {
-                                                            $examStatus = 'Failed';
-                                                        }
-                                                    }
-                                                @endphp
+                                                                $assignAttempts = $assessAttempts->where('assign_id', $subAssignId);
+                                                                $attemptsToUse = $assignAttempts->isNotEmpty() ? $assignAttempts : $assessAttempts;
 
-                                                <div class="row mt-3 mb-3">
-                                                    <div class="col-12">
-                                                        <div class="exam-result-block">
-                                                            <div>
-                                                                <div class="border-left-3p-b1 ps-2">Assignment Name</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="ml-0 w-100 oneline-text-truncate">
-                                                                        {{ optional($assignment_exam->assignment_exam_name)->name ?? 'N/A' }}
-                                                                    </span>
+                                                                $passedAttempt = $attemptsToUse->first(function($a) {
+                                                                    if (!$a) return false;
+                                                                    if (method_exists($a, 'hasPassed')) {
+                                                                        return $a->hasPassed();
+                                                                    }
+                                                                    $payload = json_decode($a->result_data ?? '', true);
+                                                                    $details = $payload['results'] ?? json_decode($a->results ?? '', true);
+                                                                    if (!is_array($details)) return false;
+                                                                    $status = strtolower(trim((string) ($details['pass_or_fail'] ?? '')));
+                                                                    if ($status !== '') return $status === 'passed';
+                                                                    return isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'];
+                                                                });
+
+                                                                $latestAttempt = $attemptsToUse->first();
+
+                                                                $result_html = '';
+                                                                $result_badge = '';
+                                                                $assessmentStatus = 'Not Attempted';
+
+                                                                if ($passedAttempt) {
+                                                                    $assessmentStatus = 'Passed';
+                                                                    $link = explode('/', $assess->file_path ?? '');
+                                                                    $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($passedAttempt->code ?? '');
+                                                                    $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $subAssignId);
+                                                                    $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $subAssignId . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $subAssignId . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-primary text-nowrap take_result exam-result-btn">View Result</a>';
+                                                                    $result_badge = '<span class="badge bg-success ms-2">Completed</span>';
+                                                                } elseif ($latestAttempt) {
+                                                                    $assessmentStatus = 'Failed';
+                                                                    $link = explode('/', $assess->file_path ?? '');
+                                                                    $result_link = ($link[0] ?? '') . '/' . ($link[1] ?? '') . '/results/' . ($latestAttempt->code ?? '');
+                                                                    $returnUrl = url('userslist?user_id=' . $user->id . '&open_tab=assessment&assign_id=' . $subAssignId);
+                                                                    $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $subAssignId . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $subAssignId . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-outline-danger text-nowrap take_result exam-result-btn">View Result</a>';
+                                                                    $result_badge = '<span class="badge bg-danger ms-2">Failed</span>';
+                                                                } else {
+                                                                    if ($subCourseStatus == 1) {
+                                                                        $assessmentStatus = 'In Progress';
+                                                                    } elseif ($subCourseStatus == 2) {
+                                                                        $assessmentStatus = 'Not Attended';
+                                                                    } elseif ($subCourseStatus == 0) {
+                                                                        $assessmentStatus = 'Pending';
+                                                                    } else {
+                                                                        $assessmentStatus = 'Not Attempted';
+                                                                    }
+                                                                }
+                                                            @endphp
+
+                                                            <div class="row mt-2 mb-3">
+                                                                <div class="col-12">
+                                                                    <div class="exam-result-block">
+                                                                        <div>
+                                                                            <div class="border-left-3p-b1 ps-2">Assessment Name</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="ml-0 w-100 oneline-text-truncate">
+                                                                                    {{ $assess->file_name }}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="result-styles ml-0">
+                                                                                    {{ $assessmentStatus }}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b3 ps-2">Action</div>
+                                                                            <div class="r-data-styles white-space-nowrap">
+                                                                                @if(!empty($result_html))
+                                                                                    <span class="ml-0">{!! $result_html !!}</span>
+                                                                                    {!! $result_badge !!}
+                                                                                @else
+                                                                                    <span class="text-muted small">Not Attempted Yet</span>
+                                                                                @endif
+
+                                                                                @if($subCourseStatus == 3 || $assessmentStatus == 'Passed')
+                                                                                    <a href="#"
+                                                                                        data-id="{{ $subAssignId }}"
+                                                                                        class="btn btn-primary btn-sm get_certificates exam-result-btn ms-2"
+                                                                                        data-bs-toggle="modal"
+                                                                                        data-bs-target="#certificateView">
+                                                                                        View Certificate
+                                                                                    </a>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b2 ps-2">Status</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="result-styles ml-0">
-                                                                        {{ $examStatus }}
-                                                                    </span>
-                                                                </div>
+                                                        @empty
+                                                            <div class="text-center py-2 text-muted small">
+                                                                No assessments found for this sub course.
                                                             </div>
-
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b3 ps-2">Score</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="result-styles ml-0">
-                                                                        {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b4 ps-2">Percentage</div>
-                                                                <div class="r-data-styles">
-                                                                    <span class="result-styles ml-0">
-                                                                        {{ number_format($percentage, 2) }}%
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
-                                                                <div class="border-left-3p-b5 ps-2">Action</div>
-                                                                <div class="r-data-styles">
-                                                                    @if($assignedExam && isset($assignedExam->exam_result) && $assignedExam->exam_result == 'Pending')
-                                                                        <a href="{{ url('view_attempted_exam') }}?assigned_id={{ $data->id ?? '' }}&course_id={{ optional($data->course_details)->id ?? '' }}&type=lead&exam_id={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
-                                                                            class="btn btn-sm btn-outline-primary text-nowrap"
-                                                                            target="_blank">
-                                                                            Evaluate Exam
-                                                                        </a>
-                                                                    @elseif($assignedExam)
-                                                                        <a href="{{ route('exams.LeadResultview') }}?course_id={{ optional($data->course_details)->id ?? '' }}&exam_name={{ optional($assignment_exam->assignment_exam_name)->exam_code ?? '' }}&ex_c={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
-                                                                            class="btn btn-sm btn-primary text-nowrap exam-result-btn"
-                                                                            target="_blank">
-                                                                            Evaluation Completed
-                                                                        </a>
-
-                                                                        @if(!empty($assignedExam->evaluation_completed_date))
-                                                                            <p class="mb-0 mt-1">
-                                                                                On : {{ \Carbon\Carbon::parse($assignedExam->evaluation_completed_date)->format('d-m-Y') }}
-                                                                            </p>
-                                                                        @endif
-                                                                    @else
-                                                                        <span class="text-muted">Not Attempted</span>
-                                                                    @endif
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                        @endforelse
                                                     </div>
                                                 </div>
-                                            @endforeach
 
+                                                {{-- SUB-COURSE ASSIGNMENTS SECTION --}}
+                                                <div class="card border rounded-3 shadow-sm bg-white mb-0 overflow-hidden">
+                                                    <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                                        <div class="d-flex align-items-center">
+                                                            <span class="badge me-2" style="background: rgba(13, 110, 253, 0.12); color: #0d6efd; font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                                                <i class="fa-solid fa-clipboard-check me-1"></i> Assignments
+                                                            </span>
+                                                            <span class="fw-semibold text-dark" style="font-size: 13px;">Sub-Course Assignments</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="card-body p-3">
+                                                        @php
+                                                            $validSubAssignments = ($subCourse->assignment_exam ?? collect())->unique(function ($assignment_exam) {
+                                                                return optional($assignment_exam->assignment_exam_name)->id;
+                                                            });
+                                                        @endphp
+
+                                                        @forelse($validSubAssignments as $assignment_exam)
+                                                            @php
+                                                                $examId = optional($assignment_exam->assignment_exam_name)->id;
+                                                                $courseId = $subCourse->id ?? null;
+                                                                $examKey = $examId . '_' . $courseId;
+
+                                                                $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
+
+                                                                $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
+                                                                    $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
+                                                                    $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
+                                                                    $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
+
+                                                                    return $pct >= 50;
+                                                                }) ?? $attemptsCollection->sortByDesc('id')->first();
+
+                                                                $assignedAnswerCount = 0;
+                                                                $assignedQuestionMarksCount = 0;
+                                                                $percentage = 0;
+                                                                $passPercentage = 50;
+                                                                $examStatus = 'Pending';
+
+                                                                if ($assignedExam) {
+                                                                    $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
+                                                                    $assignedQuestionMarksCount = (float) ($allQuestionMarks[$assignedExam->exam_id] ?? 0);
+
+                                                                    if ($assignedQuestionMarksCount > 0) {
+                                                                        $percentage = round(
+                                                                            ($assignedAnswerCount / $assignedQuestionMarksCount) * 100,
+                                                                            2
+                                                                        );
+                                                                    }
+
+                                                                    if (
+                                                                        isset($assignedExam->exam_result) &&
+                                                                        $assignedExam->exam_result == 'Pending'
+                                                                    ) {
+                                                                        $examStatus = 'Pending';
+                                                                    } elseif ($percentage >= $passPercentage) {
+                                                                        $examStatus = 'Passed';
+                                                                    } else {
+                                                                        $examStatus = 'Failed';
+                                                                    }
+                                                                }
+                                                            @endphp
+
+                                                            <div class="row mt-2 mb-3">
+                                                                <div class="col-12">
+                                                                    <div class="exam-result-block">
+                                                                        <div>
+                                                                            <div class="border-left-3p-b1 ps-2">Assignment Name</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="ml-0 w-100 oneline-text-truncate">
+                                                                                    {{ optional($assignment_exam->assignment_exam_name)->name ?? 'N/A' }}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b2 ps-2">Status</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="result-styles ml-0">
+                                                                                    {{ $examStatus }}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b3 ps-2">Score</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="result-styles ml-0">
+                                                                                    {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b4 ps-2">Percentage</div>
+                                                                            <div class="r-data-styles">
+                                                                                <span class="result-styles ml-0">
+                                                                                    {{ number_format($percentage, 2) }}%
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div class="ms-0 ms-lg-4 mt-2 mt-lg-0">
+                                                                            <div class="border-left-3p-b5 ps-2">Action</div>
+                                                                            <div class="r-data-styles">
+                                                                                @if($assignedExam && isset($assignedExam->exam_result) && $assignedExam->exam_result == 'Pending')
+                                                                                    <a href="{{ url('view_attempted_exam') }}?assigned_id={{ $subAssignId ?? '' }}&course_id={{ $courseId ?? '' }}&type=lead&exam_id={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                                        class="btn btn-sm btn-outline-primary text-nowrap"
+                                                                                        target="_blank">
+                                                                                        Evaluate Exam
+                                                                                    </a>
+                                                                                @elseif($assignedExam)
+                                                                                    <a href="{{ route('exams.LeadResultview') }}?course_id={{ $courseId ?? '' }}&exam_name={{ optional($assignment_exam->assignment_exam_name)->exam_code ?? '' }}&ex_c={{ optional($assignment_exam->assignment_exam_name)->id ?? '' }}&user_id={{ $user->id ?? '' }}"
+                                                                                        class="btn btn-sm btn-primary text-nowrap exam-result-btn"
+                                                                                        target="_blank">
+                                                                                        Evaluation Completed
+                                                                                    </a>
+
+                                                                                    @if(!empty($assignedExam->evaluation_completed_date))
+                                                                                        <p class="mb-0 mt-1">
+                                                                                            On : {{ \Carbon\Carbon::parse($assignedExam->evaluation_completed_date)->format('d-m-Y') }}
+                                                                                        </p>
+                                                                                    @endif
+                                                                                @else
+                                                                                    <span class="text-muted small">Not Attempted</span>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @empty
+                                                            <div class="text-center py-2 text-muted small">
+                                                                No assignments found for this sub course.
+                                                            </div>
+                                                        @endforelse
+                                                    </div>
+                                                </div>
                                             </div>
-
                                         </div>
-
                                     </div>
-
                                 </div>
-
                             </div>
-
                         @endforeach
+                    @endif
+                @endforeach
 
             </div>
         </div>
