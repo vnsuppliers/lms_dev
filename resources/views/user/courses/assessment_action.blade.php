@@ -1,6 +1,37 @@
 @php
     $attempts = $assessment->assessment_all_results->where('assign_id', $courses_data->id);
-    $passedAttempt = $attempts->sortByDesc('id')->first(fn ($attempt) => $attempt->hasPassed());
+    if ($attempts->isEmpty()) {
+        $allType6Docs = \App\Models\Course_documents::where('course_id', $courses_data->course_id)
+            ->where('type', 6)
+            ->where('is_delete', 0)
+            ->get();
+        $matchedDocIds = $allType6Docs->filter(function($d) use ($assessment) {
+            return $d->id == $assessment->id || trim(strtolower($d->file_name)) === trim(strtolower($assessment->file_name));
+        })->pluck('id');
+        $courseDocIds = $matchedDocIds->isNotEmpty() ? $matchedDocIds : $allType6Docs->pluck('id');
+
+        $attempts = \App\Models\Assessment_results::where(function($q) use ($courses_data, $courseDocIds) {
+                if ($courses_data->id) {
+                    $q->where('assign_id', $courses_data->id);
+                }
+                if ($courseDocIds->isNotEmpty()) {
+                    $q->orWhere(function($subQ) use ($courseDocIds, $courses_data) {
+                        $subQ->whereIn('course_document_id', $courseDocIds)
+                            ->where(function($aQ) use ($courses_data) {
+                                $aQ->whereNull('assign_id')
+                                   ->orWhere('assign_id', 0)
+                                   ->orWhere('assign_id', $courses_data->id);
+                            });
+                    });
+                }
+            })
+            ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+            ->whereNull('deleted_at')
+            ->orderBy('id', 'asc')
+            ->get();
+    }
+    $latestThreeAttempts = $attempts->sortBy('id')->values()->slice(-3)->values();
+    $passedAttempt = $latestThreeAttempts->first(fn ($attempt) => $attempt->hasPassed());
 @endphp
 
 @if($passedAttempt)

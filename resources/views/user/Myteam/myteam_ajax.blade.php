@@ -239,7 +239,26 @@
                                                 @forelse ($validAssessments as $assess)
                                                     @php
                                                         $assessAttempts = collect();
-                                                        if (isset($allResults)) {
+                                                        if (isset($allUserAssessmentResults)) {
+                                                            // 1. Direct match by course_document_id and assign_id
+                                                            $assessAttempts = $allUserAssessmentResults->filter(function($r) use ($assess, $data) {
+                                                                return (int)$r->course_document_id === (int)$assess->id && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                                                            })->values();
+
+                                                            // 2. Fallback: match by file_name within the same course if re-uploaded
+                                                            if ($assessAttempts->isEmpty()) {
+                                                                $courseDocs = isset($allCourseDocsRaw) ? ($allCourseDocsRaw->get($courseDetails->id) ?? collect()) : collect();
+                                                                $matchedDocIds = $courseDocs->filter(function($d) use ($assess) {
+                                                                    return (int)$d->id === (int)$assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                                                                })->pluck('id')->toArray();
+
+                                                                if (!empty($matchedDocIds)) {
+                                                                    $assessAttempts = $allUserAssessmentResults->filter(function($r) use ($matchedDocIds, $data) {
+                                                                        return in_array($r->course_document_id, $matchedDocIds) && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                                                                    })->values();
+                                                                }
+                                                            }
+                                                        } elseif (isset($allResults)) {
                                                             $rawAttempts = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
                                                                 ? $allResults->get($assess->id)
                                                                 : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
@@ -251,12 +270,15 @@
                                                             } elseif (is_array($rawAttempts)) {
                                                                 $assessAttempts = collect($rawAttempts);
                                                             }
+                                                            $assessAttempts = $assessAttempts->filter(function($r) use ($data) {
+                                                                return empty($r->assign_id) || (int)$r->assign_id === (int)$data->id;
+                                                            })->values();
                                                         }
 
-                                                        $assignAttempts = $assessAttempts->where('assign_id', $data->id);
-                                                        $attemptsToUse = $assignAttempts->isNotEmpty() ? $assignAttempts : $assessAttempts;
+                                                        // Evaluate only latest up to 3 attempts
+                                                        $latestThreeAttempts = $assessAttempts->take(3);
 
-                                                        $passedAttempt = $attemptsToUse->first(function($a) {
+                                                        $passedAttempt = $latestThreeAttempts->first(function($a) {
                                                             if (!$a) return false;
                                                             if (method_exists($a, 'hasPassed')) {
                                                                 return $a->hasPassed();
@@ -269,7 +291,7 @@
                                                             return isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'];
                                                         });
 
-                                                        $latestAttempt = $attemptsToUse->first();
+                                                        $latestAttempt = $latestThreeAttempts->first();
 
                                                         $result_html = '';
                                                         $result_badge = '';
@@ -290,15 +312,7 @@
                                                             $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $data->id . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $data->id . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-outline-danger text-nowrap take_result exam-result-btn">View Result</a>';
                                                             $result_badge = '<span class="badge bg-danger ms-2">Failed</span>';
                                                         } else {
-                                                            if ($data->status == 1) {
-                                                                $assessmentStatus = 'In Progress';
-                                                            } elseif ($data->status == 2) {
-                                                                $assessmentStatus = 'Not Attended';
-                                                            } elseif ($data->status == 0) {
-                                                                $assessmentStatus = 'Pending';
-                                                            } else {
-                                                                $assessmentStatus = 'Not Attempted';
-                                                            }
+                                                            $assessmentStatus = 'Not Attempted';
                                                         }
                                                     @endphp
 
@@ -378,21 +392,26 @@
                                                         $courseId = $courseDetails->id ?? null;
                                                         $examKey = $examId . '_' . $courseId;
 
-                                                        $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
+                                                        $attemptsCollection = ($allExamAttempts[$examKey] ?? collect())->filter(function($att) use ($data) {
+                                                            return empty($att->assigned_id) || (int)$att->assigned_id === (int)$data->id;
+                                                        })->values();
 
-                                                        $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
+                                                        // Evaluate latest up to 3 attempts
+                                                        $latestThreeAttempts = $attemptsCollection->take(3);
+
+                                                        $assignedExam = $latestThreeAttempts->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
                                                             $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
                                                             $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
                                                             $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
 
-                                                            return $pct >= 50;
-                                                        }) ?? $attemptsCollection->sortByDesc('id')->first();
+                                                            return $pct >= 50 || (isset($attempt->exam_result) && strtolower($attempt->exam_result) === 'pass');
+                                                        }) ?? $latestThreeAttempts->first();
 
                                                         $assignedAnswerCount = 0;
                                                         $assignedQuestionMarksCount = 0;
                                                         $percentage = 0;
                                                         $passPercentage = 50;
-                                                        $examStatus = 'Pending';
+                                                        $examStatus = 'Not Attempted';
 
                                                         if ($assignedExam) {
                                                             $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
@@ -410,7 +429,7 @@
                                                                 $assignedExam->exam_result == 'Pending'
                                                             ) {
                                                                 $examStatus = 'Pending';
-                                                            } elseif ($percentage >= $passPercentage) {
+                                                            } elseif ($percentage >= $passPercentage || (isset($assignedExam->exam_result) && strtolower($assignedExam->exam_result) === 'pass')) {
                                                                 $examStatus = 'Passed';
                                                             } else {
                                                                 $examStatus = 'Failed';
@@ -443,7 +462,7 @@
                                                                     <div class="border-left-3p-b3 ps-2">Score</div>
                                                                     <div class="r-data-styles">
                                                                         <span class="result-styles ml-0">
-                                                                            {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
+                                                                            {{ $assignedExam ? $assignedAnswerCount . '/' . $assignedQuestionMarksCount : '-' }}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -452,7 +471,7 @@
                                                                     <div class="border-left-3p-b4 ps-2">Percentage</div>
                                                                     <div class="r-data-styles">
                                                                         <span class="result-styles ml-0">
-                                                                            {{ number_format($percentage, 2) }}%
+                                                                            {{ $assignedExam ? number_format($percentage, 2) . '%' : '-' }}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -578,7 +597,26 @@
                                                         @forelse ($validSubAssessments as $assess)
                                                             @php
                                                                 $assessAttempts = collect();
-                                                                if (isset($allResults)) {
+                                                                if (isset($allUserAssessmentResults)) {
+                                                                    // 1. Direct match by course_document_id and subAssignId
+                                                                    $assessAttempts = $allUserAssessmentResults->filter(function($r) use ($assess, $subAssignId) {
+                                                                        return (int)$r->course_document_id === (int)$assess->id && (empty($r->assign_id) || (int)$r->assign_id === (int)$subAssignId);
+                                                                    })->values();
+
+                                                                    // 2. Fallback: match by file_name within the same sub-course if re-uploaded
+                                                                    if ($assessAttempts->isEmpty()) {
+                                                                        $courseDocs = isset($allCourseDocsRaw) ? ($allCourseDocsRaw->get($subCourse->id) ?? collect()) : collect();
+                                                                        $matchedDocIds = $courseDocs->filter(function($d) use ($assess) {
+                                                                            return (int)$d->id === (int)$assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                                                                        })->pluck('id')->toArray();
+
+                                                                        if (!empty($matchedDocIds)) {
+                                                                            $assessAttempts = $allUserAssessmentResults->filter(function($r) use ($matchedDocIds, $subAssignId) {
+                                                                                return in_array($r->course_document_id, $matchedDocIds) && (empty($r->assign_id) || (int)$r->assign_id === (int)$subAssignId);
+                                                                            })->values();
+                                                                        }
+                                                                    }
+                                                                } elseif (isset($allResults)) {
                                                                     $rawAttempts = $allResults instanceof \Illuminate\Support\Collection && $allResults->has($assess->id)
                                                                         ? $allResults->get($assess->id)
                                                                         : ($allResults[$assess->id] ?? $allResults[(string)$assess->id] ?? null);
@@ -590,12 +628,15 @@
                                                                     } elseif (is_array($rawAttempts)) {
                                                                         $assessAttempts = collect($rawAttempts);
                                                                     }
+                                                                    $assessAttempts = $assessAttempts->filter(function($r) use ($subAssignId) {
+                                                                        return empty($r->assign_id) || (int)$r->assign_id === (int)$subAssignId;
+                                                                    })->values();
                                                                 }
 
-                                                                $assignAttempts = $assessAttempts->where('assign_id', $subAssignId);
-                                                                $attemptsToUse = $assignAttempts->isNotEmpty() ? $assignAttempts : $assessAttempts;
+                                                                // Evaluate latest up to 3 attempts
+                                                                $latestThreeAttempts = $assessAttempts->take(3);
 
-                                                                $passedAttempt = $attemptsToUse->first(function($a) {
+                                                                $passedAttempt = $latestThreeAttempts->first(function($a) {
                                                                     if (!$a) return false;
                                                                     if (method_exists($a, 'hasPassed')) {
                                                                         return $a->hasPassed();
@@ -608,7 +649,7 @@
                                                                     return isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'];
                                                                 });
 
-                                                                $latestAttempt = $attemptsToUse->first();
+                                                                $latestAttempt = $latestThreeAttempts->first();
 
                                                                 $result_html = '';
                                                                 $result_badge = '';
@@ -629,15 +670,7 @@
                                                                     $result_html = '<a href="javascript:;" data-user-id="' . $user->id . '" data-assign-id="' . $subAssignId . '" data-link="' . rtrim($assessmentBaseUrl, '/') . '/start_assessment?url=' . $result_link . '&email=' . $user->email . '&username=' . $user->username . '&first_name=' . $user->first_name . '&last_name=' . $user->emp_id . '&course_id=' . $assess->id . '&assign_id=' . $subAssignId . '&return_url=' . urlencode($returnUrl) . '&lms_url=' . urlencode(url('/')) . '" class="btn btn-sm btn-outline-danger text-nowrap take_result exam-result-btn">View Result</a>';
                                                                     $result_badge = '<span class="badge bg-danger ms-2">Failed</span>';
                                                                 } else {
-                                                                    if ($subCourseStatus == 1) {
-                                                                        $assessmentStatus = 'In Progress';
-                                                                    } elseif ($subCourseStatus == 2) {
-                                                                        $assessmentStatus = 'Not Attended';
-                                                                    } elseif ($subCourseStatus == 0) {
-                                                                        $assessmentStatus = 'Pending';
-                                                                    } else {
-                                                                        $assessmentStatus = 'Not Attempted';
-                                                                    }
+                                                                    $assessmentStatus = 'Not Attempted';
                                                                 }
                                                             @endphp
 
@@ -717,21 +750,26 @@
                                                                 $courseId = $subCourse->id ?? null;
                                                                 $examKey = $examId . '_' . $courseId;
 
-                                                                $attemptsCollection = ($allExamAttempts[$examKey] ?? collect());
+                                                                $attemptsCollection = ($allExamAttempts[$examKey] ?? collect())->filter(function($att) use ($subAssignId) {
+                                                                    return empty($att->assigned_id) || (int)$att->assigned_id === (int)$subAssignId;
+                                                                })->values();
 
-                                                                $assignedExam = $attemptsCollection->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
+                                                                // Evaluate latest up to 3 attempts
+                                                                $latestThreeAttempts = $attemptsCollection->take(3);
+
+                                                                $assignedExam = $latestThreeAttempts->first(function($attempt) use ($allAnswerMarks, $allQuestionMarks, $examId) {
                                                                     $ansCount = (float)($allAnswerMarks[$attempt->id] ?? 0);
                                                                     $qMarks = (float)($allQuestionMarks[$examId] ?? 0);
                                                                     $pct = $qMarks > 0 ? ($ansCount / $qMarks) * 100 : 0;
 
-                                                                    return $pct >= 50;
-                                                                }) ?? $attemptsCollection->sortByDesc('id')->first();
+                                                                    return $pct >= 50 || (isset($attempt->exam_result) && strtolower($attempt->exam_result) === 'pass');
+                                                                }) ?? $latestThreeAttempts->first();
 
                                                                 $assignedAnswerCount = 0;
                                                                 $assignedQuestionMarksCount = 0;
                                                                 $percentage = 0;
                                                                 $passPercentage = 50;
-                                                                $examStatus = 'Pending';
+                                                                $examStatus = 'Not Attempted';
 
                                                                 if ($assignedExam) {
                                                                     $assignedAnswerCount = (float) ($allAnswerMarks[$assignedExam->id] ?? 0);
@@ -749,7 +787,7 @@
                                                                         $assignedExam->exam_result == 'Pending'
                                                                     ) {
                                                                         $examStatus = 'Pending';
-                                                                    } elseif ($percentage >= $passPercentage) {
+                                                                    } elseif ($percentage >= $passPercentage || (isset($assignedExam->exam_result) && strtolower($assignedExam->exam_result) === 'pass')) {
                                                                         $examStatus = 'Passed';
                                                                     } else {
                                                                         $examStatus = 'Failed';
@@ -782,7 +820,7 @@
                                                                             <div class="border-left-3p-b3 ps-2">Score</div>
                                                                             <div class="r-data-styles">
                                                                                 <span class="result-styles ml-0">
-                                                                                    {{ $assignedAnswerCount }}/{{ $assignedQuestionMarksCount }}
+                                                                                    {{ $assignedExam ? $assignedAnswerCount . '/' . $assignedQuestionMarksCount : '-' }}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -791,7 +829,7 @@
                                                                             <div class="border-left-3p-b4 ps-2">Percentage</div>
                                                                             <div class="r-data-styles">
                                                                                 <span class="result-styles ml-0">
-                                                                                    {{ number_format($percentage, 2) }}%
+                                                                                    {{ $assignedExam ? number_format($percentage, 2) . '%' : '-' }}
                                                                                 </span>
                                                                             </div>
                                                                         </div>

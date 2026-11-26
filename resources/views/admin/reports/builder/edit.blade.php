@@ -25,6 +25,7 @@
     $savedCourseActive = $config['course_active_filter'] ?? 'all';
     $savedDepartment = $config['department_filter'] ?? 'all';
     $savedDesignation = $config['designation_filter'] ?? 'all';
+    $savedIncludeSub = !empty($config['include_subcourses']);
 
     $savedFields = array_values(array_filter($config['fields'] ?? ($config['selected_fields'] ?? []), function($k) {
         return $k === 'users.emp_id' || (!str_ends_with($k, '.id') && !str_ends_with($k, '_id'));
@@ -481,7 +482,15 @@
                                         </div>
                                     </div>
                                 </div>
-                                <small class="text-muted font-smallsize">Click dropdown and type in the search box to filter by course title.</small>
+                                <div class="d-flex justify-content-between align-items-center mt-1">
+                                    <small class="text-muted font-smallsize">Click dropdown and type in the search box to filter by course title.</small>
+                                    <div class="form-check form-check-inline m-0 ps-2" id="includeSubcoursesWrapper" style="{{ ($savedCourse && $savedCourse !== 'all') ? '' : 'display: none;' }}">
+                                        <input class="form-check-input" type="checkbox" name="include_subcourses" id="includeSubcoursesCheck" value="1" {{ $savedIncludeSub ? 'checked' : '' }} style="cursor: pointer;">
+                                        <label class="form-check-label font-smallsize text-dark fw-semibold" for="includeSubcoursesCheck" style="cursor: pointer;">
+                                            <i class="fa-solid fa-diagram-project text-teal me-1" style="color: #008080;"></i> Include Sub Courses
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -661,6 +670,8 @@
                                 </div>
                                 <small class="text-muted font-smallsize">Filter records by learning stage or progress status.</small>
                             </div>
+
+
                         </div>
 
                         <!-- Row 3: Department & Designation Filter Row -->
@@ -1677,6 +1688,12 @@ $(document).ready(function () {
         $('#courseOptionsList .dropdown-course-item').removeClass('active-item');
         $(this).addClass('active-item');
         $('#courseDropdownMenu').addClass('d-none');
+        if (val !== 'all') {
+            $('#includeSubcoursesWrapper').show();
+        } else {
+            $('#includeSubcoursesWrapper').hide();
+            $('#includeSubcoursesCheck').prop('checked', false);
+        }
     });
 
     // Select User Status Item
@@ -1799,10 +1816,16 @@ $(document).ready(function () {
                     $('#selectedCourseLabel').html('<i class="fa-solid fa-book-open me-1 text-teal" style="color: #008080;"></i> ' + title);
                 }
 
+                let isSub = (c.parent_id && parseInt(c.parent_id) > 0);
+                if (isSub) { searchIndex += " sub course"; }
                 html += `
-                    <div class="dropdown-course-item p-2 rounded cursor-pointer border-bottom ${isSel}" data-value="${c.id}" data-search="${searchIndex}" data-label="${title}" style="cursor: pointer;">
+                    <div class="dropdown-course-item p-2 rounded cursor-pointer border-bottom ${isSel}" data-value="${c.id}" data-search="${searchIndex}" data-label="${title}" data-is-sub="${isSub ? 1 : 0}" style="cursor: pointer;">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold text-dark font-smallsize"><i class="fa-solid fa-book-open text-secondary me-1" style="font-size: 11px;"></i>${title}</span>
+                            <span class="fw-semibold text-dark font-smallsize">
+                                <i class="${isSub ? "fa-solid fa-sitemap text-teal" : "fa-solid fa-book-open text-secondary"} me-1" style="font-size: 11px; ${isSub ? "color: #008080;" : ""}"></i>
+                                ${isSub ? `<span class="badge text-white me-1 font-smallsize" style="background-color: #008080; font-size: 9.5px; padding: 2px 5px;">Sub Course</span>` : ""}
+                                ${title}
+                            </span>
                             ${code ? `<span class="badge bg-light text-muted border font-smallsize">${code}</span>` : ''}
                         </div>
                     </div>
@@ -2710,6 +2733,7 @@ $(document).ready(function () {
             filters: filters,
             learner_filter: $('#universalLearnerFilter').val(),
             course_filter: $('#universalCourseFilter').val(),
+            include_subcourses: $('#includeSubcoursesCheck').is(':checked') ? 1 : 0,
             user_status_filter: $('#universalUserStatusFilter').val(),
             course_active_filter: $('#universalCourseActiveFilter').val(),
             department_filter: $('#universalDepartmentFilter').val(),
@@ -2774,7 +2798,13 @@ $(document).ready(function () {
             if (h === 'S.No' || h === '#') {
                 colStyle = 'style="width: 55px; min-width: 45px; text-align: center; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
             } else if (h === 'Course Name') {
-                colStyle = 'style="min-width: 240px; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
+                colStyle = 'style="min-width: 250px; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
+            } else if (h === 'Course Type') {
+                colStyle = 'style="width: 140px; min-width: 130px; text-align: center; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
+            } else if (h === 'Parent Course Name' || h.indexOf('Parent Course') !== -1) {
+                colStyle = 'style="min-width: 240px; text-align: start; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
+            } else if (h === 'Sub Courses List' || h.indexOf('Sub Course') !== -1) {
+                colStyle = 'style="min-width: 320px; text-align: start; white-space: normal; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
             } else if (h.indexOf('Assessment Name') !== -1 || h.indexOf('Assignment Name') !== -1 || h.indexOf('Content Title') !== -1 || h === 'Exam Name') {
                 colStyle = 'style="min-width: 250px; white-space: nowrap; vertical-align: middle; padding: 10px 12px; font-weight: 600; font-size: 13px;"';
             } else if (h.indexOf('Users') !== -1) {
@@ -2824,7 +2854,7 @@ $(document).ready(function () {
                         let span = typeof rowspans[j] !== 'undefined' ? rowspans[j] : 1;
                         if (span > 0) {
                             let hName = data.headers[j] || '';
-                            let isCenter = hName === 'S.No' || hName === '#' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1 || hName.indexOf('Count') !== -1 || hName.indexOf('Rate') !== -1;
+                            let isCenter = hName === 'S.No' || hName === '#' || hName === 'Course Type' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1 || hName.indexOf('Count') !== -1 || hName.indexOf('Rate') !== -1;
                             let cellAlign = isCenter ? 'text-center' : 'text-start';
                             let spanAttr = span > 1 ? `rowspan="${span}"` : '';
                             let bgStyle = span > 1 ? 'background-color: #ffffff;' : '';
@@ -2847,7 +2877,7 @@ $(document).ready(function () {
                     }
                     for (let j = startIdx; j < data.headers.length; j++) {
                         let hName = data.headers[j] || '';
-                        let isCenter = hName === 'S.No' || hName === '#' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1;
+                        let isCenter = hName === 'S.No' || hName === '#' || hName === 'Course Type' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1;
                         let cellAlign = isCenter ? 'text-center' : 'text-start';
                         tbodyHtml += `<td class="align-middle ${cellAlign}" style="padding: 8px 10px; vertical-align: middle !important; border: 1px solid #e9ecef;">${r[j] !== null && r[j] !== undefined ? r[j] : '-'}</td>`;
                     }
@@ -2855,7 +2885,7 @@ $(document).ready(function () {
                     $.each(r, function (j, cell) {
                         if (typeof j === 'string' && j.startsWith('_')) return;
                         let hName = data.headers[j] || '';
-                        let isCenter = hName === 'S.No' || hName === '#' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1;
+                        let isCenter = hName === 'S.No' || hName === '#' || hName === 'Course Type' || hName.indexOf('Attempts') !== -1 || hName.indexOf('Result') !== -1 || hName.indexOf('Marks') !== -1 || hName.indexOf('Score') !== -1 || hName.indexOf('Time') !== -1 || hName.indexOf('Status') !== -1 || hName.indexOf('Date') !== -1 || hName.indexOf('Completed') !== -1;
                         let cellAlign = isCenter ? 'text-center' : 'text-start';
                         let sNoStyle = (hName === 'S.No' || hName === '#') ? 'font-weight: 600; color: #475569;' : '';
                         tbodyHtml += `<td class="align-top ${cellAlign}" style="padding: 8px 10px; vertical-align: top !important; border: 1px solid #e9ecef; ${sNoStyle}">${cell !== null ? cell : '-'}</td>`;
@@ -2923,6 +2953,7 @@ $(document).ready(function () {
             filters: [],
             learner_filter: $('#universalLearnerFilter').val(),
             course_filter: $('#universalCourseFilter').val(),
+            include_subcourses: $('#includeSubcoursesCheck').is(':checked') ? 1 : 0,
             user_status_filter: $('#universalUserStatusFilter').val(),
             course_active_filter: $('#universalCourseActiveFilter').val(),
             department_filter: $('#universalDepartmentFilter').val(),

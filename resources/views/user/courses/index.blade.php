@@ -165,8 +165,12 @@
     a.assigned_courses:hover .course-name:not(.course-name-expired),
     .course-name:hover:not(.course-name-expired),
     .course-name.active-course-underline:not(.course-name-expired) {
-        text-decoration: underline !important;
+        text-decoration: none !important;
         color: #005452 !important;
+    }
+    .course-name,
+    .course-name.active-course-underline {
+        text-decoration: none !important;
     }
     .course-name-expired,
     .course-name-expired:hover,
@@ -224,14 +228,35 @@
                                         <div class="horizontal-tabs-div">
                                             <div class="d-flex flex-wrap horizontal-tabs justify-content-between align-items-center gap-2">
                                                 <div class="d-flex flex-wrap align-items-center">
+                                                    @php
+                                                        $todayDate = \Carbon\Carbon::today();
+                                                        $notStartedCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) !== 0 && (int)($item->status ?? 0) !== 2) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return empty($exp) || $exp == '1970-01-01 00:00:00' || $exp == '1970-01-01' || \Carbon\Carbon::parse($exp)->gte($todayDate);
+                                                        })->count();
+
+                                                        $inProgressCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) !== 1) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return empty($exp) || $exp == '1970-01-01 00:00:00' || $exp == '1970-01-01' || \Carbon\Carbon::parse($exp)->gte($todayDate);
+                                                        })->count();
+
+                                                        $completedCount = $countlist->where('status', '==', 3)->count();
+
+                                                        $expiredCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) === 3) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return !empty($exp) && $exp != '1970-01-01 00:00:00' && $exp != '1970-01-01' && \Carbon\Carbon::parse($exp)->lt($todayDate);
+                                                        })->count();
+                                                    @endphp
                                                     <a href="{{url('user_courses')}}?menu=my_course&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='my_course' || Request::get('menu')=='' ) btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">My All Courses <span> - {{count($countlist)??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=Offline&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&status=1&assign_status=0&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='Offline') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Not started <span> - {{count($countlist->where('status','==',0))??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=progress&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='progress') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">In-progress<span> - {{count($countlist->where('status','==',1))??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=bookmark&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&assign_status=3&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='bookmark') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus @if(!in_array(Request::get('menu'), ['due_soon', 'expired', 'bookmarked']) && Request::get('bookmark') != 1) me-0 @endif">Completed<span> - {{count($countlist->where('status','==',3))??''}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=Offline&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&status=1&assign_status=0&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='Offline') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Not started <span> - {{$notStartedCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=progress&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='progress') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">In-progress<span> - {{$inProgressCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=bookmark&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&assign_status=3&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='bookmark') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Completed<span> - {{$completedCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=expired&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='expired') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus @if(!in_array(Request::get('menu'), ['due_soon', 'bookmarked']) && Request::get('bookmark') != 1) me-0 @endif">Expired<span> - {{$expiredCount}}</span></a>
                                                     @if(Request::get('menu') == 'due_soon')
                                                         <a href="{{url('user_courses')}}?menu=due_soon" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0">Courses Due Soon <span> - {{count($list)}}</span></a>
-                                                    @elseif(Request::get('menu') == 'expired')
-                                                        <a href="{{url('user_courses')}}?menu=expired" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0" style="text-decoration: none !important; border-bottom: none !important;">Courses Expired <span> - {{count($list)}}</span></a>
                                                     @elseif(Request::get('menu') == 'bookmarked' || Request::get('bookmark') == 1)
                                                         <a href="{{url('user_courses')}}?menu=bookmarked" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0">Bookmarked Courses <span> - {{count($list)}}</span></a>
                                                     @endif

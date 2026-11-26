@@ -1093,7 +1093,9 @@ public function user_registrations_store(Request $request)
             $user = User::findOrFail($request->id);
             $user->delete();
 
-            return redirect('users?tab=2')->with('success', 'User deleted successfully.');
+            $page = $request->input('page') ?: $request->query('page');
+            $url = 'users?tab=2' . ($page ? '&page=' . $page : '');
+            return redirect($url)->with('success', 'User deleted successfully.');
         }
 
 public function fetchUserData(Request $request)
@@ -1156,9 +1158,14 @@ $courseNames = $courses->map(function ($course) {
         'courses' => $courseNames??null, 
     ];
 
+    $assignsKeyed = AsignedUser::where('user_id', $user->id)
+        ->whereIn('course_id', $courses->pluck('id'))
+        ->get()
+        ->keyBy('course_id');
+
     $assignedUserData = [];
     foreach ($courses as $course) {
-        $assign = AsignedUser::where('user_id', $user->id)->where('course_id', $course->id)->first();
+        $assign = $assignsKeyed->get($course->id);
         $course_image = !empty($course->course_image) 
             ? url("storage/app/public/" . $course->course_image) 
             : url("public/images/face12.jpg"); // Default image URL
@@ -1180,20 +1187,47 @@ $courseNames = $courses->map(function ($course) {
     $total_courses = AsignedUser::has('course_details')->has('category_details')
         ->where('user_id', $user->id)
         ->whereHas('course_details', function($q) use ($request) {
-            $q->where('course_type', 1);
+            $q->where('course_type', 1)->whereNull('parent_id');
         })->count();
+
+    // Sync assignment status so DB reflects actual assessment/assignment passing results
+    $allUserAssessmentResults = Assessment_results::where('user_id', $user->id)->whereNull('deleted_at')->get();
+    $allUserExamAttempts = ExamAttempt::where('user_id', $user->id)->get();
+
+    $userResultDocIds = $allUserAssessmentResults->pluck('course_document_id')->filter()->unique();
+    $resultCourseIds = Course_documents::whereIn('id', $userResultDocIds)->pluck('course_id')->filter()->unique()->toArray();
+    $attemptCourseIds = $allUserExamAttempts->pluck('course_id')->filter()->unique()->toArray();
+    $candidateCourseIds = array_unique(array_merge($resultCourseIds, $attemptCourseIds));
+
+    $userAssignsToHeal = AsignedUser::has('course_details')->has('category_details')
+        ->where('user_id', $user->id)
+        ->where(function($q) use ($candidateCourseIds) {
+            $q->where('status', 3);
+            if (!empty($candidateCourseIds)) {
+                $q->orWhereIn('course_id', $candidateCourseIds);
+            }
+        })
+        ->get();
+    foreach ($userAssignsToHeal as $uAssign) {
+        $passed = $uAssign->isCompletedAndPassed($allUserAssessmentResults, $allUserExamAttempts);
+        if ($passed && (int)$uAssign->status !== 3) {
+            $uAssign->update(['status' => 3]);
+        } elseif (!$passed && (int)$uAssign->status === 3) {
+            $uAssign->update(['status' => 1]);
+        }
+    }
 
     $completed_course = AsignedUser::has('course_details')->has('category_details')
         ->where('user_id', $user->id)
         ->whereHas('course_details', function ($q) {
-            $q->where('course_type', 1);
+            $q->where('course_type', 1)->whereNull('parent_id');
         })
         ->where('status', 3)->count();
 
     $inprogress_count = AsignedUser::has('course_details')->has('category_details')
         ->where('user_id', $user->id)
         ->whereHas('course_details', function ($q) {
-            $q->where('course_type', 1)
+            $q->where('course_type', 1)->whereNull('parent_id')
               ->where(function ($expQ) {
                   $expQ->whereNull('expiration_date')
                        ->orWhere('expiration_date', '>=', Carbon::now())
@@ -1205,7 +1239,7 @@ $courseNames = $courses->map(function ($course) {
     $pending_count = AsignedUser::has('course_details')->has('category_details')
         ->where('user_id', $user->id)
         ->whereHas('course_details', function ($q) {
-            $q->where('course_type', 1)
+            $q->where('course_type', 1)->whereNull('parent_id')
               ->where(function ($expQ) {
                   $expQ->whereNull('expiration_date')
                        ->orWhere('expiration_date', '>=', Carbon::now())
@@ -1224,7 +1258,7 @@ $courseNames = $courses->map(function ($course) {
         ->where('user_id', $user->id)
         ->where('status', '!=', 3)
         ->whereHas('course_details', function ($q) {
-            $q->where('course_type', 1)
+            $q->where('course_type', 1)->whereNull('parent_id')
               ->whereNotNull('expiration_date')
               ->where('expiration_date', '!=', '1970-01-01 00:00:00')
               ->where('expiration_date', '!=', '1970-01-01')
@@ -1358,6 +1392,74 @@ $courseNames = $courses->map(function ($course) {
         });
     })->where('user_id', $user->id)->get();
 
+    // Pre-load all related data in bulk to eliminate thousands of N+1 database queries
+    $allAssignedCourseIds = $assessments->pluck('course_id')->filter()->unique()->toArray();
+    $subCoursesByParent = Courses::whereIn('parent_id', $allAssignedCourseIds)
+        ->where('is_delete', 0)
+        ->with(['assignment_exam.assignment_exam_name', 'parent_course', 'category_details'])
+        ->get()
+        ->groupBy('parent_id');
+
+    $allSubCourseIds = $subCoursesByParent->flatten()->pluck('id')->toArray();
+    $allCourseIds = array_unique(array_merge($allAssignedCourseIds, $allSubCourseIds));
+
+    // Keep all documents (both active and historical) to accurately link user attempts even if an assessment was revised
+    $allCourseDocsRaw = Course_documents::whereIn('course_id', $allCourseIds)
+        ->whereIn('type', [6, 7])
+        ->where('is_delete', 0)
+        ->get()
+        ->groupBy('course_id');
+
+    $allCourseDocs = Course_documents::whereIn('course_id', $allCourseIds)
+        ->whereIn('type', [6, 7])
+        ->where('is_delete', 0)
+        ->where(function ($q) {
+            $q->where('is_active', 1)->orWhereNull('is_active');
+        })
+        ->get()
+        ->groupBy('course_id');
+
+    $allCourseDocsForReports = Course_documents::whereIn('course_id', $allCourseIds)
+        ->whereIn('type', [6, 7])
+        ->where('is_delete', 0)
+        ->whereNotNull('file_name')
+        ->where('file_name', '!=', '')
+        ->get()
+        ->groupBy('course_id');
+
+    $allUserAssessmentResults = Assessment_results::where('user_id', $user->id)
+        ->whereNull('deleted_at')
+        ->orderBy('id', 'asc')
+        ->get();
+    $assessmentResultsByDoc = $allUserAssessmentResults->groupBy('course_document_id');
+
+    $allUserExamAttempts = ExamAttempt::with('exam_details')
+        ->whereHas('exam_details')
+        ->where('user_id', $user->id)
+        ->orderBy('id', 'desc')
+        ->get();
+    $examAttemptsByCourse = $allUserExamAttempts->groupBy('course_id');
+
+    $allExamCodes = $allCourseDocsRaw->flatten()->where('type', 7)->pluck('file_path')->filter()->unique()->toArray();
+    $allExamsByCode = !empty($allExamCodes) ? Exam::whereIn('exam_code', $allExamCodes)->get()->keyBy('exam_code') : collect();
+
+    $allExamIds = $allUserExamAttempts->pluck('exam_id')->filter()->unique()->toArray();
+    $questionMarksByExam = !empty($allExamIds) ? Question::whereIn('exam_id', $allExamIds)
+        ->groupBy('exam_id')
+        ->selectRaw('exam_id, SUM(question_mark) as total_mark')
+        ->pluck('total_mark', 'exam_id') : collect();
+
+    $allAttemptIds = $allUserExamAttempts->pluck('id')->filter()->unique()->toArray();
+    $answerMarksByAttempt = !empty($allAttemptIds) ? Answer::whereIn('exam_attendance_id', $allAttemptIds)
+        ->groupBy('exam_attendance_id')
+        ->selectRaw('exam_attendance_id, SUM(answer_marks) as total_earned')
+        ->pluck('total_earned', 'exam_attendance_id') : collect();
+
+    $allUserSubAssigns = !empty($allSubCourseIds) ? AsignedUser::where('user_id', $user->id)
+        ->whereIn('course_id', $allSubCourseIds)
+        ->get()
+        ->keyBy('course_id') : collect();
+
     $course_html_data = '<div class="table-responsive">
         <table class="table table-bordered align-middle mb-0" style="table-layout: fixed; width: 100%;">
             <thead class="table-light">
@@ -1387,25 +1489,16 @@ $courseNames = $courses->map(function ($course) {
                 continue;
             }
 
-            // Active assessments for this course (type 6) - only active, non-deleted
-            $courseAssessments = Course_documents::where('course_id', $data->course_id)
+            // Active assessments for this course (type 6) - retrieved from preloaded collection
+            $courseAssessments = ($allCourseDocs->get($data->course_id) ?? collect())
                 ->where('type', 6)
-                ->where('is_delete', 0)
-                ->where(function ($q) {
-                    $q->where('is_active', 1)->orWhereNull('is_active');
-                })
-                ->whereNotNull('file_name')
-                ->where('file_name', '!=', '')
-                ->get();
+                ->filter(fn($d) => !empty($d->file_name))
+                ->values();
 
-            // Active assignments for this course (type 7) - only active, non-deleted
-            $courseAssignments = Course_documents::where('course_id', $data->course_id)
+            // Active assignments for this course (type 7) - retrieved from preloaded collection
+            $courseAssignments = ($allCourseDocs->get($data->course_id) ?? collect())
                 ->where('type', 7)
-                ->where('is_delete', 0)
-                ->where(function ($q) {
-                    $q->where('is_active', 1)->orWhereNull('is_active');
-                })
-                ->get();
+                ->values();
 
             $defined_exams = $data->course_details->assignment_exam ?? collect();
 
@@ -1425,14 +1518,45 @@ $courseNames = $courses->map(function ($course) {
             // Check if assessments were passed/attempted
             if ($hasAssessments) {
                 foreach ($courseAssessments as $assess) {
-                    $result_datas = Assessment_results::where('course_document_id', $assess->id)
-                        ->where('user_id', $user->id)
-                        ->where(function($q) use ($data) {
-                            $q->where('assign_id', $data->id)->orWhereNull('assign_id');
+                    $allResults = ($assessmentResultsByDoc->get($assess->id) ?? collect())
+                        ->filter(function($r) use ($data) {
+                            return empty($r->assign_id) || (int)$r->assign_id === (int)$data->id;
                         })
-                        ->whereNull('deleted_at')
-                        ->latest()
-                        ->first();
+                        ->values();
+
+                    if ($allResults->isEmpty()) {
+                        $matchedDocIds = ($allCourseDocsRaw->get($data->course_id) ?? collect())
+                            ->where('type', 6)
+                            ->filter(function($d) use ($assess) {
+                                return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                            })
+                            ->pluck('id')
+                            ->toArray();
+
+                        $allResults = $allUserAssessmentResults->filter(function($r) use ($matchedDocIds, $data) {
+                            return in_array($r->course_document_id, $matchedDocIds) && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                        })->values();
+
+                        if ($allResults->isEmpty()) {
+                            $courseDocs = ($allCourseDocsRaw->get($data->course_id) ?? collect())->where('type', 6)->pluck('id')->toArray();
+                            $allResults = $allUserAssessmentResults->filter(function($r) use ($data, $courseDocs) {
+                                return in_array($r->course_document_id, $courseDocs) && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                            })->values();
+                        }
+
+                        if ($allResults->isEmpty()) {
+                            $allResults = $allUserAssessmentResults->filter(function($r) use ($data) {
+                                return (int)$r->assign_id === (int)$data->id;
+                            })->values();
+                        }
+                    }
+
+                    $latestThreeResults = $allResults->slice(-3)->values();
+                    $passedRes = $latestThreeResults->first(function($r) {
+                        return $r->hasPassed();
+                    });
+
+                    $result_datas = $passedRes ?: $latestThreeResults->last();
 
                     $isAttempted = !empty($result_datas);
                     $isPassed = false;
@@ -1469,23 +1593,17 @@ $courseNames = $courses->map(function ($course) {
                     $allAssignmentsPassed = false;
                 } else {
                     foreach ($uniqueExamCodes as $examCode) {
-                        $exam = Exam::where('exam_code', $examCode)->first();
+                        $exam = $allExamsByCode->get($examCode);
                         if (!$exam) {
                             $allAssignmentsPassed = false;
                             break;
                         }
 
-                        $passed = ExamAttempt::where('exam_id', $exam->id)
-                            ->where(function ($q) use ($data, $user) {
-                                $q->where('assigned_id', $data->id)
-                                  ->orWhere(function ($sub) use ($data, $user) {
-                                      $sub->where('user_id', $user->id)
-                                          ->whereNull('assigned_id')
-                                          ->where('course_id', $data->course_id);
-                                  });
-                            })
-                            ->whereRaw('LOWER(exam_result) = ?', ['passed'])
-                            ->exists();
+                        $passed = $allUserExamAttempts->contains(function ($att) use ($exam, $data) {
+                            if ((int)$att->exam_id !== (int)$exam->id) return false;
+                            $matchesAssign = ((int)$att->assigned_id === (int)$data->id) || (empty($att->assigned_id) && (int)$att->course_id === (int)$data->course_id);
+                            return $matchesAssign && strtolower(trim($att->exam_result ?? '')) === 'passed';
+                        });
 
                         if (!$passed) {
                             $allAssignmentsPassed = false;
@@ -1507,23 +1625,12 @@ $courseNames = $courses->map(function ($course) {
                 $canShowCertificate = ((int)$data->status === 3);
             }
 
-            if (method_exists($data, 'isCompletedAndPassed')) {
-                $canShowCertificate = $canShowCertificate && $data->isCompletedAndPassed();
-            }
-
             // Gather assignment exam items for this course & user (bound to current assignment, excluding old reassigned attempts)
-            $assignment_exams = ExamAttempt::with('exam_details')
-                ->whereHas('exam_details')
-                ->where('user_id', $user->id)
-                ->where('course_id', $data->course_id)
-                ->where(function ($q) use ($data) {
-                    $q->where('assigned_id', $data->id)
-                      ->orWhere(function ($sub) use ($data) {
-                          $sub->whereNull('assigned_id')->where('course_id', $data->course_id);
-                      });
+            $assignment_exams = ($examAttemptsByCourse->get($data->course_id) ?? collect())
+                ->filter(function ($att) use ($data) {
+                    return ((int)$att->assigned_id === (int)$data->id) || empty($att->assigned_id);
                 })
-                ->orderBy('id', 'desc')
-                ->get();
+                ->values();
 
             $hasAnyAssignmentAttempted = $assignment_exams->isNotEmpty();
             $hasFailedAssignment = false;
@@ -1535,39 +1642,50 @@ $courseNames = $courses->map(function ($course) {
 
             $hasAnyCourses = true;
 
-            // Overall course status badge
-            if ($canShowCertificate) {
-                $courseStatusBadge = '<span class="badge bg-success px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Completed</span>';
-            } else {
-                $isCourseExpired = !empty($data->course_details->expiration_date) 
-                    && $data->course_details->expiration_date !== '1970-01-01 00:00:00' 
-                    && $data->course_details->expiration_date !== '1970-01-01' 
-                    && \Carbon\Carbon::parse($data->course_details->expiration_date)->isPast();
-
-                if ($isCourseExpired) {
-                    $courseStatusBadge = '<span class="badge bg-danger px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;"><i class="bi bi-calendar-x me-1"></i>Expired</span>';
-                } elseif ($hasFailedAssessment || $hasFailedAssignment || (int)$data->status === 2) {
-                    $courseStatusBadge = '<span class="badge bg-danger px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Failed</span>';
-                } elseif ($hasAnyAssessmentAttempted || $hasAnyAssignmentAttempted || (int)$data->status === 1) {
-                    $courseStatusBadge = '<span class="badge bg-warning text-dark px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">In Progress</span>';
-                } else {
-                    $courseStatusBadge = '<span class="badge bg-secondary px-3 py-2" style="font-size: 12px; font-weight: 500; border-radius: 4px;">Not Attempted</span>';
-                }
-            }
-
             // Build Table 1 Rows (Course Assessments)
             $table1_rows = '';
             if ($hasAssessments) {
                 $totalAssessments = $courseAssessments->count();
                 foreach ($courseAssessments as $index => $assess) {
-                    $result_datas = Assessment_results::where('course_document_id', $assess->id)
-                        ->where('user_id', $user->id)
-                        ->where(function($q) use ($data) {
-                            $q->where('assign_id', $data->id)->orWhereNull('assign_id');
+                    $allResults = ($assessmentResultsByDoc->get($assess->id) ?? collect())
+                        ->filter(function($r) use ($data) {
+                            return empty($r->assign_id) || (int)$r->assign_id === (int)$data->id;
                         })
-                        ->whereNull('deleted_at')
-                        ->latest()
-                        ->first();
+                        ->values();
+
+                    if ($allResults->isEmpty()) {
+                        $matchedDocIds = ($allCourseDocsRaw->get($data->course_id) ?? collect())
+                            ->where('type', 6)
+                            ->filter(function($d) use ($assess) {
+                                return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                            })
+                            ->pluck('id')
+                            ->toArray();
+
+                        $allResults = $allUserAssessmentResults->filter(function($r) use ($matchedDocIds, $data) {
+                            return in_array($r->course_document_id, $matchedDocIds) && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                        })->values();
+
+                        if ($allResults->isEmpty()) {
+                            $courseDocs = ($allCourseDocsRaw->get($data->course_id) ?? collect())->where('type', 6)->pluck('id')->toArray();
+                            $allResults = $allUserAssessmentResults->filter(function($r) use ($data, $courseDocs) {
+                                return in_array($r->course_document_id, $courseDocs) && (empty($r->assign_id) || (int)$r->assign_id === (int)$data->id);
+                            })->values();
+                        }
+
+                        if ($allResults->isEmpty()) {
+                            $allResults = $allUserAssessmentResults->filter(function($r) use ($data) {
+                                return (int)$r->assign_id === (int)$data->id;
+                            })->values();
+                        }
+                    }
+
+                    $latestThreeResults = $allResults->slice(-3)->values();
+                    $passedRes = $latestThreeResults->first(function($r) {
+                        return $r->hasPassed();
+                    });
+
+                    $result_datas = $passedRes ?: $latestThreeResults->last();
 
                     $isPassed = false;
                     $statusLabel = 'Not Attempted';
@@ -1789,8 +1907,8 @@ $courseNames = $courses->map(function ($course) {
                         if ($statusLower === 'pending') {
                             $assignmentScoreHtml = '<span class="badge bg-warning text-dark px-2 py-1" style="font-size: 11px;">Under Evaluation</span>';
                         } else {
-                            $totalExamMarks = Question::where('exam_id', $item['exam_id'])->sum('question_mark');
-                            $userObtainedMarks = Answer::where('exam_attendance_id', $item['attempt']->id)->sum('answer_marks');
+                            $totalExamMarks = (float)($questionMarksByExam->get($item['exam_id']) ?? 0);
+                            $userObtainedMarks = (float)($answerMarksByAttempt->get($item['attempt']->id) ?? 0);
                             if ($totalExamMarks > 0) {
                                 $pct = round(($userObtainedMarks / $totalExamMarks) * 100, 1);
                                 $assignmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $userObtainedMarks . ' / ' . $totalExamMarks . '</span> <span class="text-muted small">(' . $pct . '%)</span>';
@@ -1802,15 +1920,17 @@ $courseNames = $courses->map(function ($course) {
 
                     $typeTd = '';
                     if ($index === 0) {
-                        $typeTd = '<td rowspan="' . $totalAssignments . '" class="text-center align-middle bg-white" style="padding: 12px 14px;"><span class="badge bg-light text-info border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assignment</span></td>';
+                        $typeTd = '<td rowspan="' . $totalAssignments . '" class="text-center align-middle bg-white" style="padding: 12px 14px;' . ($hasAssessments ? ' border-top: 2px solid #94a3b8 !important;' : '') . '"><span class="badge bg-light text-info border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assignment</span></td>';
                     }
+
+                    $cellSepStyle = ($hasAssessments && $index === 0) ? 'border-top: 2px solid #94a3b8 !important;' : '';
 
                     $table2_rows .= '<tr>
                         ' . $typeTd . '
-                        <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important;">' . htmlspecialchars($item['name']) . '</td>
-                        <td class="text-center align-middle" style="padding: 12px 14px;">' . $assignmentScoreHtml . '</td>
-                        <td class="text-center align-middle" style="padding: 12px 14px;">' . $statusBadge . '</td>
-                        <td class="text-center align-middle" style="padding: 12px 14px;">' . $actionBtn . '</td>
+                        <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important; ' . $cellSepStyle . '">' . htmlspecialchars($item['name']) . '</td>
+                        <td class="text-center align-middle" style="padding: 12px 14px; ' . $cellSepStyle . '">' . $assignmentScoreHtml . '</td>
+                        <td class="text-center align-middle" style="padding: 12px 14px; ' . $cellSepStyle . '">' . $statusBadge . '</td>
+                        <td class="text-center align-middle" style="padding: 12px 14px; ' . $cellSepStyle . '">' . $actionBtn . '</td>
                     </tr>';
                 }
             }
@@ -1897,14 +2017,8 @@ $courseNames = $courses->map(function ($course) {
                 </div>
             </div>';
 
-            // Check for child sub-courses
-            $subCoursesList = collect();
-            if (empty($data->course_details->parent_id)) {
-                $subCoursesList = Courses::where('parent_id', $data->course_details->id)
-                    ->where('is_delete', 0)
-                    ->with(['assignment_exam.assignment_exam_name', 'parent_course'])
-                    ->get();
-            }
+            // Check for child sub-courses from preloaded collection
+            $subCoursesList = empty($data->course_details->parent_id) ? ($subCoursesByParent->get($data->course_details->id, collect())) : collect();
             $hasChildSubCourses = $subCoursesList->isNotEmpty();
             $parentRowStyle = $hasChildSubCourses ? 'style="border-left: 4px solid #005452 !important;"' : '';
 
@@ -1936,23 +2050,14 @@ $courseNames = $courses->map(function ($course) {
             // Sub-courses belonging to this course (in Section 1: Course Assessments & Certificates)
             if ($hasChildSubCourses) {
                 foreach ($subCoursesList as $subCourse) {
-                    $subCourseAssessments = Course_documents::where('course_id', $subCourse->id)
+                    $subCourseAssessments = ($allCourseDocs->get($subCourse->id) ?? collect())
                         ->where('type', 6)
-                        ->where('is_delete', 0)
-                        ->where(function ($q) {
-                            $q->where('is_active', 1)->orWhereNull('is_active');
-                        })
-                        ->whereNotNull('file_name')
-                        ->where('file_name', '!=', '')
-                        ->get();
+                        ->filter(fn($d) => !empty($d->file_name))
+                        ->values();
 
-                    $subCourseAssignments = Course_documents::where('course_id', $subCourse->id)
+                    $subCourseAssignments = ($allCourseDocs->get($subCourse->id) ?? collect())
                         ->where('type', 7)
-                        ->where('is_delete', 0)
-                        ->where(function ($q) {
-                            $q->where('is_active', 1)->orWhereNull('is_active');
-                        })
-                        ->get();
+                        ->values();
 
                     $subDefinedExams = $subCourse->assignment_exam ?? collect();
 
@@ -1971,11 +2076,47 @@ $courseNames = $courses->map(function ($course) {
                     if ($subHasAssess) {
                         $subTotalAssess = $subCourseAssessments->count();
                         foreach ($subCourseAssessments as $subIdx => $assess) {
-                            $result_datas = Assessment_results::where('course_document_id', $assess->id)
-                                ->where('user_id', $user->id)
-                                ->whereNull('deleted_at')
-                                ->latest()
-                                ->first();
+                            $subAssign = $allUserSubAssigns->get($subCourse->id);
+                            $targetSubAssignId = $subAssign ? $subAssign->id : $data->id;
+                            $allSubResults = ($assessmentResultsByDoc->get($assess->id) ?? collect())
+                                ->filter(function($r) use ($targetSubAssignId) {
+                                    return empty($r->assign_id) || (int)$r->assign_id === (int)$targetSubAssignId;
+                                })
+                                ->values();
+
+                            if ($allSubResults->isEmpty()) {
+                                $matchedDocIds = ($allCourseDocsRaw->get($subCourse->id) ?? collect())
+                                    ->where('type', 6)
+                                    ->filter(function($d) use ($assess) {
+                                        return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                                    })
+                                    ->pluck('id')
+                                    ->toArray();
+
+                                $allSubResults = $allUserAssessmentResults->filter(function($r) use ($matchedDocIds, $targetSubAssignId) {
+                                    return in_array($r->course_document_id, $matchedDocIds) && (empty($r->assign_id) || (int)$r->assign_id === (int)$targetSubAssignId);
+                                })->values();
+
+                                if ($allSubResults->isEmpty()) {
+                                    $subDocs = ($allCourseDocsRaw->get($subCourse->id) ?? collect())->where('type', 6)->pluck('id')->toArray();
+                                    $allSubResults = $allUserAssessmentResults->filter(function($r) use ($subDocs, $targetSubAssignId) {
+                                        return in_array($r->course_document_id, $subDocs) && (empty($r->assign_id) || (int)$r->assign_id === (int)$targetSubAssignId);
+                                    })->values();
+                                }
+
+                                if ($allSubResults->isEmpty()) {
+                                    $allSubResults = $allUserAssessmentResults->filter(function($r) use ($targetSubAssignId) {
+                                        return (int)$r->assign_id === (int)$targetSubAssignId;
+                                    })->values();
+                                }
+                            }
+
+                            $latestThreeSubResults = $allSubResults->slice(-3)->values();
+                            $passedSubRes = $latestThreeSubResults->first(function($r) {
+                                return $r->hasPassed();
+                            });
+
+                            $result_datas = $passedSubRes ?: $latestThreeSubResults->last();
 
                             $isPassed = false;
                             $statusLabel = 'Not Attempted';
@@ -2071,22 +2212,13 @@ $courseNames = $courses->map(function ($course) {
                         }
                     }
 
-                    $subAssignmentExams = ExamAttempt::with('exam_details')
-                        ->whereHas('exam_details')
-                        ->where('user_id', $user->id)
-                        ->where('course_id', $subCourse->id)
-                        ->where(function ($q) use ($subCourse, $data, $user) {
-                            $subAssign = AsignedUser::where('user_id', $user->id)->where('course_id', $subCourse->id)->first();
-                            if ($subAssign) {
-                                $q->where('assigned_id', $subAssign->id)
-                                  ->orWhereNull('assigned_id');
-                            } else {
-                                $q->where('assigned_id', $data->id)
-                                  ->orWhereNull('assigned_id');
-                            }
+                    $subAssign = $allUserSubAssigns->get($subCourse->id);
+                    $subTargetAssignId = $subAssign ? $subAssign->id : $data->id;
+                    $subAssignmentExams = ($examAttemptsByCourse->get($subCourse->id) ?? collect())
+                        ->filter(function ($att) use ($subTargetAssignId) {
+                            return ((int)$att->assigned_id === (int)$subTargetAssignId) || empty($att->assigned_id);
                         })
-                        ->orderBy('id', 'desc')
-                        ->get();
+                        ->values();
 
                     $subItems = [];
                     $subHandledExamIds = [];
@@ -2191,8 +2323,8 @@ $courseNames = $courses->map(function ($course) {
                                 if ($statusLower === 'pending') {
                                     $assignmentScoreHtml = '<span class="badge bg-warning text-dark px-2 py-1" style="font-size: 11px;">Under Evaluation</span>';
                                 } else {
-                                    $totalExamMarks = Question::where('exam_id', $item['exam_id'])->sum('question_mark');
-                                    $userObtainedMarks = Answer::where('exam_attendance_id', $item['attempt']->id)->sum('answer_marks');
+                                    $totalExamMarks = (float)($questionMarksByExam->get($item['exam_id']) ?? 0);
+                                    $userObtainedMarks = (float)($answerMarksByAttempt->get($item['attempt']->id) ?? 0);
                                     if ($totalExamMarks > 0) {
                                         $pct = round(($userObtainedMarks / $totalExamMarks) * 100, 1);
                                         $assignmentScoreHtml = '<span class="fw-bold" style="color: #212529;">' . $userObtainedMarks . ' / ' . $totalExamMarks . '</span> <span class="text-muted small">(' . $pct . '%)</span>';
@@ -2204,15 +2336,17 @@ $courseNames = $courses->map(function ($course) {
 
                             $typeTd = '';
                             if ($subItemIdx === 0) {
-                                $typeTd = '<td rowspan="' . $totalSubAssignments . '" class="text-center align-middle bg-white" style="padding: 12px 14px;"><span class="badge bg-light text-info border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assignment</span></td>';
+                                $typeTd = '<td rowspan="' . $totalSubAssignments . '" class="text-center align-middle bg-white" style="padding: 12px 14px;' . ($subHasAssess ? ' border-top: 2px solid #94a3b8 !important;' : '') . '"><span class="badge bg-light text-info border px-2 py-1" style="font-size: 12px; font-weight: 600;">Assignment</span></td>';
                             }
+
+                            $subCellSepStyle = ($subHasAssess && $subItemIdx === 0) ? 'border-top: 2px solid #94a3b8 !important;' : '';
 
                             $subTable2_rows .= '<tr>
                                 ' . $typeTd . '
-                                <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important;">' . htmlspecialchars($item['name']) . '</td>
-                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $assignmentScoreHtml . '</td>
-                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $statusBadge . '</td>
-                                <td class="text-center align-middle" style="padding: 12px 14px;">' . $actionBtn . '</td>
+                                <td class="align-middle fw-semibold" style="padding: 12px 16px; color: #212529 !important; ' . $subCellSepStyle . '">' . htmlspecialchars($item['name']) . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px; ' . $subCellSepStyle . '">' . $assignmentScoreHtml . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px; ' . $subCellSepStyle . '">' . $statusBadge . '</td>
+                                <td class="text-center align-middle" style="padding: 12px 14px; ' . $subCellSepStyle . '">' . $actionBtn . '</td>
                             </tr>';
                         }
                     }
@@ -2369,29 +2503,21 @@ foreach ($userAssignedForReports as $idx => $assign) {
     }
     $courseId = $assign->course_id;
 
-    $cDocIds = Course_documents::where('course_id', $courseId)
-        ->where('type', 6)
-        ->where('is_delete', 0)
-        ->pluck('id');
+    $cDocIds = ($allCourseDocsRaw->get($courseId) ?? ($allCourseDocs->get($courseId) ?? collect()))->where('type', 6)->pluck('id');
 
-    $cAssessmentResults = Assessment_results::where('user_id', $user->id)
-        ->where(function($q) use ($assign, $cDocIds) {
-            $q->where('assign_id', $assign->id)
-              ->orWhereIn('course_document_id', $cDocIds);
-        })
-        ->whereNull('deleted_at')
-        ->orderBy('id', 'asc')
-        ->get();
+    $cAssessmentResults = $allUserAssessmentResults->filter(function($r) use ($assign, $cDocIds) {
+        if (!empty($r->assign_id) && (int)$r->assign_id !== (int)$assign->id) {
+            return false;
+        }
+        return ((int)$r->assign_id === (int)$assign->id) || $cDocIds->contains($r->course_document_id);
+    })->values();
 
-    $cExamAttempts = ExamAttempt::where('user_id', $user->id)
-        ->where(function($q) use ($assign, $courseId) {
-            $q->where('assigned_id', $assign->id)
-              ->orWhere(function ($sub) use ($courseId) {
-                  $sub->whereNull('assigned_id')->where('course_id', $courseId);
-              });
-        })
-        ->orderBy('id', 'asc')
-        ->get();
+    $cExamAttempts = ($examAttemptsByCourse->get($courseId) ?? collect())->filter(function($att) use ($assign, $courseId) {
+        if (!empty($att->assigned_id) && (int)$att->assigned_id !== (int)$assign->id) {
+            return false;
+        }
+        return ((int)$att->assigned_id === (int)$assign->id) || empty($att->assigned_id);
+    })->values();
 
     // Dynamically resolved application timezone & parser for timestamps
     $appTimezone = config('app.timezone') ?: (date_default_timezone_get() ?: 'UTC');
@@ -2465,8 +2591,8 @@ foreach ($userAssignedForReports as $idx => $assign) {
         $cLastAccessed = 'Not Yet Accessed';
     }
 
-    // 2. Attempts & Pass/Fail (Take latest up to 3 valid attempts per course)
-    $rawAttempts = $cAssessmentResults->count() + $cExamAttempts->count();
+    // 2. Attempts & Pass/Fail for Assessments (Take latest up to 3 valid assessment attempts per course)
+    $rawAttempts = $cAssessmentResults->count();
     $cAttempts = min(3, $rawAttempts);
     $overallAttemptCount += $cAttempts;
 
@@ -2475,21 +2601,8 @@ foreach ($userAssignedForReports as $idx => $assign) {
     $latestExamAttempts = $cExamAttempts->count() > 3 ? $cExamAttempts->slice(-3)->values() : $cExamAttempts;
 
     // Check if course has active assessments (type 6) or active assignments (type 7)
-    $cActiveAssessments = Course_documents::where('course_id', $courseId)
-        ->where('type', 6)
-        ->where('is_delete', 0)
-        ->where(function ($q) {
-            $q->where('is_active', 1)->orWhereNull('is_active');
-        })
-        ->get();
-
-    $cActiveAssignments = Course_documents::where('course_id', $courseId)
-        ->where('type', 7)
-        ->where('is_delete', 0)
-        ->where(function ($q) {
-            $q->where('is_active', 1)->orWhereNull('is_active');
-        })
-        ->get();
+    $cActiveAssessments = ($allCourseDocs->get($courseId) ?? collect())->where('type', 6)->values();
+    $cActiveAssignments = ($allCourseDocs->get($courseId) ?? collect())->where('type', 7)->values();
 
     $hasAssess = $cActiveAssessments->isNotEmpty();
     $hasAssign = $cActiveAssignments->isNotEmpty();
@@ -2499,7 +2612,28 @@ foreach ($userAssignedForReports as $idx => $assign) {
         $allAssessPassed = true;
         if ($hasAssess) {
             foreach ($cActiveAssessments as $assess) {
-                $passed = $cAssessmentResults->where('course_document_id', $assess->id)->contains(function($res) {
+                $aRes = $cAssessmentResults->where('course_document_id', $assess->id);
+                if ($aRes->isEmpty()) {
+                    $matchedDocIds = ($allCourseDocsRaw->get($courseId) ?? collect())
+                        ->where('type', 6)
+                        ->filter(function($d) use ($assess) {
+                            return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                        })
+                        ->pluck('id')
+                        ->toArray();
+                    $aRes = $cAssessmentResults->filter(function($r) use ($matchedDocIds) {
+                        return in_array($r->course_document_id, $matchedDocIds);
+                    })->values();
+
+                    if ($aRes->isEmpty()) {
+                        $courseDocs = ($allCourseDocsRaw->get($courseId) ?? collect())->where('type', 6)->pluck('id')->toArray();
+                        $aRes = $cAssessmentResults->filter(function($r) use ($courseDocs) {
+                            return in_array($r->course_document_id, $courseDocs);
+                        })->values();
+                    }
+                }
+                $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+                $passed = $aLatest->contains(function($res) {
                     if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
                         return true;
                     }
@@ -2552,21 +2686,13 @@ foreach ($userAssignedForReports as $idx => $assign) {
         $cBadge = '<span class="report-badge-neutral">Not Attempted</span>';
     }
 
-    // Scores breakdown from latest up to 3 attempts
+    // Scores breakdown from latest up to 3 assessment attempts
     $cScores = [];
     foreach ($latestAssessmentResults as $res) {
         $payload = json_decode($res->result_data ?? '', true);
         $details = $payload['results'] ?? json_decode($res->results ?? '', true);
         if (isset($details['percentage']) && is_numeric($details['percentage'])) {
             $score = round((float)$details['percentage'], 1);
-            $cScores[] = $score;
-            $overallScores[] = $score;
-        }
-    }
-
-    foreach ($latestExamAttempts as $att) {
-        if (isset($att->percentage) && is_numeric($att->percentage)) {
-            $score = round((float)$att->percentage, 1);
             $cScores[] = $score;
             $overallScores[] = $score;
         }
@@ -2593,14 +2719,43 @@ foreach ($userAssignedForReports as $idx => $assign) {
     $cHighest = !empty($cScores) ? max($cScores) . '%' : '-';
     $cLowest = !empty($cScores) ? min($cScores) . '%' : '-';
 
-    // Build per-assessment dropdown options if course has multiple assessments/assignments
+    // Build per-assessment dropdown options if course has multiple active assessments
+    $cReportAssessments = $cActiveAssessments;
+
     $cAssessmentOptions = [];
     $cAssessmentOptionsMap = [];
 
-    foreach ($cActiveAssessments as $assessIdx => $assess) {
+    $nameCounts = [];
+    foreach ($cReportAssessments as $doc) {
+        $n = !empty($doc->file_name) ? trim($doc->file_name) : 'Assessment';
+        $nameCounts[$n] = ($nameCounts[$n] ?? 0) + 1;
+    }
+    $seenNames = [];
+
+    foreach ($cReportAssessments as $assessIdx => $assess) {
         $aRes = $cAssessmentResults->where('course_document_id', $assess->id);
-        $aCount = min(3, $aRes->count());
-        $aIsPassed = $aRes->contains(function($r) {
+        if ($aRes->isEmpty()) {
+            $matchedDocIds = ($allCourseDocsRaw->get($courseId) ?? collect())
+                ->where('type', 6)
+                ->filter(function($d) use ($assess) {
+                    return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                })
+                ->pluck('id')
+                ->toArray();
+            $aRes = $cAssessmentResults->filter(function($r) use ($matchedDocIds) {
+                return in_array($r->course_document_id, $matchedDocIds);
+            })->values();
+
+            if ($aRes->isEmpty()) {
+                $courseDocs = ($allCourseDocsRaw->get($courseId) ?? collect())->where('type', 6)->pluck('id')->toArray();
+                $aRes = $cAssessmentResults->filter(function($r) use ($courseDocs) {
+                    return in_array($r->course_document_id, $courseDocs);
+                })->values();
+            }
+        }
+        $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+        $aCount = $aLatest->count();
+        $aIsPassed = $aLatest->contains(function($r) {
             if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
             $payload = json_decode($r->result_data ?? '', true);
             $details = $payload['results'] ?? json_decode($r->results ?? '', true);
@@ -2609,7 +2764,6 @@ foreach ($userAssignedForReports as $idx => $assign) {
         });
 
         $aScores = [];
-        $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
         foreach ($aLatest as $r) {
             $payload = json_decode($r->result_data ?? '', true);
             $details = $payload['results'] ?? json_decode($r->results ?? '', true);
@@ -2617,20 +2771,21 @@ foreach ($userAssignedForReports as $idx => $assign) {
                 $aScores[] = round((float)$details['percentage'], 1);
             }
         }
-        if ($aIsPassed) {
-            foreach ($aRes as $r) {
-                $payload = json_decode($r->result_data ?? '', true);
-                $details = $payload['results'] ?? json_decode($r->results ?? '', true);
-                if (isset($details['percentage']) && is_numeric($details['percentage'])) {
-                    $pScore = round((float)$details['percentage'], 1);
-                    if (!in_array($pScore, $aScores)) $aScores[] = $pScore;
-                }
-            }
-        }
 
         $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
         $aKey = 'assess_' . $assess->id;
-        $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($assessIdx + 1));
+        
+        $baseName = !empty($assess->file_name) ? trim($assess->file_name) : ('Assessment ' . ($assessIdx + 1));
+        if (($nameCounts[$baseName] ?? 0) > 1) {
+            if ((int)($assess->is_active ?? 0) === 1) {
+                $aName = $baseName . ' (Active)';
+            } else {
+                $seenNames[$baseName] = ($seenNames[$baseName] ?? 0) + 1;
+                $aName = $baseName . ' (v' . $seenNames[$baseName] . ')';
+            }
+        } else {
+            $aName = $baseName;
+        }
 
         $optData = [
             'key' => $aKey,
@@ -2653,21 +2808,22 @@ foreach ($userAssignedForReports as $idx => $assign) {
 
     if ($cCardStatus === 'Passed') {
         $cCardBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
-    } elseif ($cCardAttempts > 0) {
+    } elseif ($cCardStatus === 'Failed' || ($cCardAttempts > 0 && $cCardStatus !== 'Passed')) {
         $cCardBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
     } else {
-        $cCardBadge = '<span class="report-badge-neutral">' . $cCardStatus . '</span>';
+        $cCardBadge = '<span class="report-badge-neutral">' . ($cCardStatus ?: 'Not Attempted') . '</span>';
     }
 
     // Dropdown HTML for multi-assessment courses
     $cDropdownHtml = '';
     if (count($cAssessmentOptions) > 1) {
+        $firstOptTitle = htmlspecialchars($cAssessmentOptions[0]['name'] ?? '');
         $cDropdownHtml .= '<div class="ms-auto flex-shrink-0" style="max-width: 50%;">';
-        $cDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 12px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px; width: 100%;">';
+        $cDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" title="' . $firstOptTitle . '" style="font-size: 12px; height: 30px; padding: 2px 24px 2px 8px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 190px; width: 100%; background-color: #fff;">';
         foreach ($cAssessmentOptions as $idxOpt => $opt) {
             $selected = ($idxOpt === 0) ? 'selected' : '';
             $fullName = $opt['name'];
-            $shortName = mb_strlen($fullName) > 22 ? mb_substr($fullName, 0, 20) . '...' : $fullName;
+            $shortName = mb_strlen($fullName) > 20 ? mb_substr($fullName, 0, 18) . '...' : $fullName;
             $cDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" title="' . htmlspecialchars($fullName) . '" ' . $selected . '>' . htmlspecialchars($shortName) . '</option>';
         }
         $cDropdownHtml .= '</select></div>';
@@ -2794,23 +2950,25 @@ foreach ($userAssignedForReports as $idx => $assign) {
                         ->where('is_delete', 0)
                         ->pluck('id');
 
+                    $subAssign = AsignedUser::where('user_id', $assign->user_id)->where('course_id', $subCourseId)->first();
+                    $targetSubAssignId = $subAssign ? $subAssign->id : $assign->id;
+
                     $subAssessmentResults = Assessment_results::where('user_id', $user->id)
                         ->whereIn('course_document_id', $subDocIds)
+                        ->where(function($q) use ($targetSubAssignId) {
+                            $q->whereNull('assign_id')
+                              ->orWhere('assign_id', 0)
+                              ->orWhere('assign_id', $targetSubAssignId);
+                        })
                         ->whereNull('deleted_at')
                         ->orderBy('id', 'asc')
                         ->get();
 
                     $subExamAttempts = ExamAttempt::where('user_id', $user->id)
                         ->where('course_id', $subCourseId)
-                        ->where(function ($q) use ($subCourseId, $assign) {
-                            $subAssign = AsignedUser::where('user_id', $assign->user_id)->where('course_id', $subCourseId)->first();
-                            if ($subAssign) {
-                                $q->where('assigned_id', $subAssign->id)
-                                  ->orWhereNull('assigned_id');
-                            } else {
-                                $q->where('assigned_id', $assign->id)
-                                  ->orWhereNull('assigned_id');
-                            }
+                        ->where(function ($q) use ($targetSubAssignId) {
+                            $q->where('assigned_id', $targetSubAssignId)
+                              ->orWhereNull('assigned_id');
                         })
                         ->orderBy('id', 'asc')
                         ->get();
@@ -2870,7 +3028,7 @@ foreach ($userAssignedForReports as $idx => $assign) {
                         $subLastAccessed = 'Not Yet Accessed';
                     }
 
-                    $rawSubAttempts = $subAssessmentResults->count() + $subExamAttempts->count();
+                    $rawSubAttempts = $subAssessmentResults->count();
                     $subAttempts = min(3, $rawSubAttempts);
                     $overallAttemptCount += $subAttempts;
 
@@ -2963,24 +3121,44 @@ foreach ($userAssignedForReports as $idx => $assign) {
                         }
                     }
 
-                    foreach ($subLatestExamAttempts as $att) {
-                        if (isset($att->percentage) && is_numeric($att->percentage)) {
-                            $score = round((float)$att->percentage, 1);
-                            $subScores[] = $score;
-                            $overallScores[] = $score;
-                        }
-                    }
-
                     $subHighest = !empty($subScores) ? max($subScores) . '%' : '-';
                     $subLowest = !empty($subScores) ? min($subScores) . '%' : '-';
+
+                    $subReportAssessments = $subActiveAssessments;
 
                     $subAssessmentOptions = [];
                     $subAssessmentOptionsMap = [];
 
-                    foreach ($subActiveAssessments as $assessIdx => $assess) {
+                    $subNameCounts = [];
+                    foreach ($subReportAssessments as $doc) {
+                        $n = !empty($doc->file_name) ? trim($doc->file_name) : 'Assessment';
+                        $subNameCounts[$n] = ($subNameCounts[$n] ?? 0) + 1;
+                    }
+                    $subSeenNames = [];
+
+                    foreach ($subReportAssessments as $assessIdx => $assess) {
                         $aRes = $subAssessmentResults->where('course_document_id', $assess->id);
-                        $aCount = min(3, $aRes->count());
-                        $aIsPassed = $aRes->contains(function($r) {
+                        if ($aRes->isEmpty()) {
+                            $matchedSubDocIds = Course_documents::where('course_id', $subCourseId)
+                                ->where('type', 6)
+                                ->where('is_delete', 0)
+                                ->get()
+                                ->filter(function($d) use ($assess) {
+                                    return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                                })
+                                ->pluck('id')
+                                ->toArray();
+                            $aRes = $subAssessmentResults->filter(function($r) use ($matchedSubDocIds) {
+                                return in_array($r->course_document_id, $matchedSubDocIds);
+                            })->values();
+
+                            if ($aRes->isEmpty()) {
+                                $aRes = $subAssessmentResults;
+                            }
+                        }
+                        $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+                        $aCount = $aLatest->count();
+                        $aIsPassed = $aLatest->contains(function($r) {
                             if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
                             $payload = json_decode($r->result_data ?? '', true);
                             $details = $payload['results'] ?? json_decode($r->results ?? '', true);
@@ -3010,7 +3188,18 @@ foreach ($userAssignedForReports as $idx => $assign) {
 
                         $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
                         $aKey = 'assess_' . $assess->id;
-                        $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($assessIdx + 1));
+                        
+                        $baseName = !empty($assess->file_name) ? trim($assess->file_name) : ('Assessment ' . ($assessIdx + 1));
+                        if (($subNameCounts[$baseName] ?? 0) > 1) {
+                            if ((int)($assess->is_active ?? 0) === 1) {
+                                $aName = $baseName . ' (Active)';
+                            } else {
+                                $subSeenNames[$baseName] = ($subSeenNames[$baseName] ?? 0) + 1;
+                                $aName = $baseName . ' (v' . $subSeenNames[$baseName] . ')';
+                            }
+                        } else {
+                            $aName = $baseName;
+                        }
 
                         $optData = [
                             'key' => $aKey,
@@ -3033,20 +3222,21 @@ foreach ($userAssignedForReports as $idx => $assign) {
 
                     if ($subCardStatus === 'Passed') {
                         $subCardBadge = '<span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>';
-                    } elseif ($subCardAttempts > 0) {
+                    } elseif ($subCardStatus === 'Failed' || ($subCardAttempts > 0 && $subCardStatus !== 'Passed')) {
                         $subCardBadge = '<span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>';
                     } else {
-                        $subCardBadge = '<span class="report-badge-neutral">' . $subCardStatus . '</span>';
+                        $subCardBadge = '<span class="report-badge-neutral">' . ($subCardStatus ?: 'Not Attempted') . '</span>';
                     }
 
                     $subDropdownHtml = '';
                     if (count($subAssessmentOptions) > 1) {
+                        $subFirstOptTitle = htmlspecialchars($subAssessmentOptions[0]['name'] ?? '');
                         $subDropdownHtml .= '<div class="ms-auto flex-shrink-0" style="max-width: 50%;">';
-                        $subDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" style="font-size: 12px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px; width: 100%;">';
+                        $subDropdownHtml .= '<select class="form-select form-select-sm report-assessment-select" title="' . $subFirstOptTitle . '" style="font-size: 12px; height: 30px; padding: 2px 24px 2px 8px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 190px; width: 100%; background-color: #fff;">';
                         foreach ($subAssessmentOptions as $idxOpt => $opt) {
                             $selected = ($idxOpt === 0) ? 'selected' : '';
                             $fullName = $opt['name'];
-                            $shortName = mb_strlen($fullName) > 22 ? mb_substr($fullName, 0, 20) . '...' : $fullName;
+                            $shortName = mb_strlen($fullName) > 20 ? mb_substr($fullName, 0, 18) . '...' : $fullName;
                             $subDropdownHtml .= '<option value="' . htmlspecialchars($opt['key']) . '" title="' . htmlspecialchars($fullName) . '" ' . $selected . '>' . htmlspecialchars($shortName) . '</option>';
                         }
                         $subDropdownHtml .= '</select></div>';

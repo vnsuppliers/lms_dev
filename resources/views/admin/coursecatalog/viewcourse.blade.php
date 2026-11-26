@@ -1049,6 +1049,16 @@ $('body').on('click', '.search_course_to_user_button', function() {
                         $('body').css('padding-right', '');
                         $('#deleteCourseModal').removeData('parent-id');
 
+                        // Update sub-course count on left list without needing full page refresh
+                        if (typeof response.sub_courses_count !== 'undefined') {
+                            var count = parseInt(response.sub_courses_count, 10);
+                            var label = count === 1 ? '1 sub course' : count + ' sub courses';
+                            var $listSubBtn = $('.sub_course_check[data-id="' + parentId + '"]');
+                            if ($listSubBtn.length) {
+                                $listSubBtn.html('<i class="fa-solid fa-layer-group me-1" style="font-size: 11px; color: #005452;"></i>' + label);
+                            }
+                        }
+
                         // Reload parent course details and re-open Sub Courses tab
                         $('#loader').css('display', 'flex').show();
                         $.ajax({

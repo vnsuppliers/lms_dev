@@ -604,7 +604,7 @@ public function fetch_course_details(Request $request) {
     $departments = Department::get();
     $designations = Designation::get();
     $completed_course = $assignedUser->where('status', 3)->filter(function ($assignment) {
-        return $assignment->course_details && $assignment->category_details;
+        return $assignment->course_details && $assignment->category_details && $assignment->isCompletedAndPassed();
     });
     $assessmentIds = $completed_course->flatMap(function ($assignment) {
         return $assignment->course_details->assessments->pluck('id');
@@ -1313,12 +1313,18 @@ public function toggleDocumentStatus(Request $request)
 
         $parentId = $course_id->parent_id;
         $course_id->delete();
+        Asigneduser::where('course_id', $course_id->id)->delete();
 
         if ($request->ajax()) {
+            $newSubCount = 0;
+            if (!empty($parentId)) {
+                $newSubCount = Courses::where('parent_id', $parentId)->where('is_delete', 0)->count();
+            }
             return response()->json([
                 'success' => true,
                 'message' => 'Sub course deleted successfully',
-                'parent_id' => $parentId
+                'parent_id' => $parentId,
+                'sub_courses_count' => $newSubCount
             ]);
         }
 

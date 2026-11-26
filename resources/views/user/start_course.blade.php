@@ -424,7 +424,30 @@
 					                            @foreach($targetAssessments as $assessment)
 					                                @php
 					                                    $assessmentAttempts = $assessment->assessment_all_results->where('assign_id', $courses_data->id);
-					                                    if ($assessmentAttempts->contains(fn ($attempt) => $attempt->hasPassed())) {
+					                                    if ($assessmentAttempts->isEmpty()) {
+					                                        $allType6Docs = \App\Models\Course_documents::where('course_id', $targetCourse->id)
+					                                            ->where('type', 6)
+					                                            ->where('is_delete', 0)
+					                                            ->get();
+					                                        $matchedDocIds = $allType6Docs->filter(function($d) use ($assessment) {
+					                                            return $d->id == $assessment->id || trim(strtolower($d->file_name)) === trim(strtolower($assessment->file_name));
+					                                        })->pluck('id')->toArray();
+					                                        $courseDocIds = !empty($matchedDocIds) ? $matchedDocIds : $allType6Docs->pluck('id')->toArray();
+
+					                                        $assessmentAttempts = \App\Models\Assessment_results::whereIn('course_document_id', $courseDocIds)
+					                                            ->where(function($q) use ($courses_data) {
+					                                                if ($courses_data->id) {
+					                                                    $q->where('assign_id', $courses_data->id)
+					                                                      ->orWhereNull('assign_id')
+					                                                      ->orWhere('assign_id', 0);
+					                                                }
+					                                            })
+					                                            ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+					                                            ->whereNull('deleted_at')
+					                                            ->get();
+					                                    }
+					                                    $latestThreeAttempts = $assessmentAttempts->sortBy('id')->values()->slice(-3)->values();
+					                                    if ($latestThreeAttempts->contains(fn ($attempt) => $attempt->hasPassed())) {
 					                                        $pass_count++;
 					                                    }
 					                                    $assDisplayName = trim($assessment->file_name ?? '');
@@ -479,9 +502,28 @@
 					                            if ($activeAssessments->count() > 0) {
 					                                foreach ($activeAssessments as $assDoc) {
 					                                    $hasPassedAss = $assDoc->assessment_all_results
-					                                        ->where('assign_id', $courses_data->id)
-					                                        ->first(fn ($att) => $att->hasPassed());
-					                                    if (!$hasPassedAss) {
+					                                        ->where('assign_id', $courses_data->id);
+					                                    if ($hasPassedAss->isEmpty()) {
+					                                        $mIds = \App\Models\Course_documents::where('course_id', $assDoc->course_id)
+					                                            ->where('type', 6)
+					                                            ->where('is_delete', 0)
+					                                            ->get()
+					                                            ->filter(fn($d) => $d->id == $assDoc->id || trim(strtolower($d->file_name)) === trim(strtolower($assDoc->file_name)))
+					                                            ->pluck('id')->toArray();
+					                                        $hasPassedAss = \App\Models\Assessment_results::whereIn('course_document_id', $mIds)
+					                                            ->where(function($q) use ($courses_data) {
+					                                                if ($courses_data->id) {
+					                                                    $q->where('assign_id', $courses_data->id)
+					                                                      ->orWhereNull('assign_id')
+					                                                      ->orWhere('assign_id', 0);
+					                                                }
+					                                            })
+					                                            ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+					                                            ->whereNull('deleted_at')
+					                                            ->get();
+					                                    }
+					                                    $passedInLatest3 = $hasPassedAss->sortBy('id')->values()->slice(-3)->values()->contains(fn($att) => $att->hasPassed());
+					                                    if (!$passedInLatest3) {
 					                                        $assessmentsPassed = false;
 					                                        break;
 					                                    }

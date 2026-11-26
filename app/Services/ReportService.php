@@ -111,6 +111,10 @@ class ReportService
             'tbl_assignedusers.completed_on' => 'Date when the learner completed the course',
             'tbl_assignedusers.progress_status' => 'Learning stage: Not Started, In Progress, Completed, or Expired',
             'tbl_courses.course_status' => 'Course progress stage: Not Started, In Progress, Completed, or Expired',
+            'tbl_courses.course_type' => 'Classification of course: Main Course or Sub Course',
+            'tbl_courses.parent_course_name' => 'Name of the parent course if this record is a sub course',
+            'tbl_courses.parent_course_code' => 'Code of the parent course if this record is a sub course',
+            'tbl_courses.sub_courses_list' => 'List of child sub-courses linked under this main course',
             'tbl_assignedusers.status' => 'Course completion status code',
             'tbl_assignedusers.result' => 'Overall evaluation result: Pass, Fail, or Not Attempted',
             'tbl_assignedusers.comments' => 'Assignment type: Newly Assigned or Reassigned',
@@ -220,8 +224,11 @@ class ReportService
             ->where(function ($q) {
                 $q->whereNull('is_delete')->orWhere('is_delete', 0);
             })
+            ->where(function ($q) {
+                $q->whereNull('parent_id')->orWhere('parent_id', 0);
+            })
             ->orderBy('course_name')
-            ->select('id', 'course_name', 'course_code')
+            ->select('id', 'course_name', 'course_code', 'parent_id')
             ->get();
 
         $learners = DB::table('users')
@@ -239,13 +246,27 @@ class ReportService
             ->select('id', 'designation_name')
             ->get();
 
-        // Single source: return standard structure with enriched section info (excluding any technical IDs)
+        // Single source: return standard structure with enriched section info (excluding any technical IDs or duplicate columns)
         if (count($validKeys) === 1) {
             $singleKey = $validKeys[0];
             $source = $sources[$singleKey];
             $cleanSingleFields = [];
+            $seenSingleKeys = [];
+            $seenSingleLabels = [];
             foreach ($source['fields'] as $fKey => $fDef) {
                 if (!$this->isTechnicalIdField($fKey, $fDef)) {
+                    $normLabel = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', $fDef['label'] ?? '')));
+                    if ($normLabel === 'coursestatusprogress') {
+                        $normLabel = 'coursestatus';
+                    }
+                    // Prevent duplicate keys or duplicate labels in single source
+                    if (isset($seenSingleKeys[$fKey]) || (!empty($normLabel) && isset($seenSingleLabels[$normLabel]))) {
+                        continue;
+                    }
+                    $seenSingleKeys[$fKey] = true;
+                    if (!empty($normLabel)) {
+                        $seenSingleLabels[$normLabel] = true;
+                    }
                     if (empty($fDef['description'])) {
                         $fDef['description'] = $this->getFieldDescription($fKey, $fDef['label'] ?? '');
                     }
@@ -298,13 +319,35 @@ class ReportService
             'departments.total_' => 'training_matrix',
         ];
 
+        // Canonical shared concepts mapping: Course Status is owned by courses if selected, else enrollments, else learners
+        $courseStatusKeys = [
+            'tbl_courses.course_status',
+            'tbl_assignedusers.progress_status',
+            'tbl_assignedusers.status',
+        ];
+        $canonicalCourseStatusSource = null;
+        if (in_array('courses', $validKeys)) {
+            $canonicalCourseStatusSource = 'courses';
+        } elseif (in_array('enrollments', $validKeys)) {
+            $canonicalCourseStatusSource = 'enrollments';
+        } elseif (in_array('learners', $validKeys)) {
+            $canonicalCourseStatusSource = 'learners';
+        } elseif (in_array('assessments', $validKeys)) {
+            $canonicalCourseStatusSource = 'assessments';
+        } elseif (in_array('videos', $validKeys)) {
+            $canonicalCourseStatusSource = 'videos';
+        }
+
         $seenFieldKeys = [];
+        $seenNormalizedLabels = [];
         $mergedFields = [];
         $fieldsBySource = [];
         $mergedGroupBy = [
             'none_individual' => 'Individual Records (Show all checked columns)',
             'users.first_name' => 'Group by Learner Name',
             'tbl_courses.course_name' => 'Group by Course Title',
+            'tbl_courses.parent_course_name' => 'Group by Parent Course',
+            'tbl_courses.course_type' => 'Group by Course Type (Main vs Sub Course)',
             'departments.department_name' => 'Group by Department',
             'tbl_categories.category_name' => 'Group by Course Category',
             'tbl_assignedusers.progress_status' => 'Group by Course Status',
@@ -348,12 +391,31 @@ class ReportService
                     }
                 }
 
-                // 3. Ensure no field key is ever repeated across sources
+                // 3. Shared concept deduplication: Course Status is emitted strictly once from its canonical owner source
+                if (in_array($fKey, $courseStatusKeys, true)) {
+                    if ($canonicalCourseStatusSource && $k !== $canonicalCourseStatusSource) {
+                        continue;
+                    }
+                }
+
+                // 4. Normalized label deduplication across all sources so no duplicate column names appear
+                $normLabel = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', $fMeta['label'] ?? '')));
+                if ($normLabel === 'coursestatusprogress') {
+                    $normLabel = 'coursestatus';
+                }
+                if (!empty($normLabel) && isset($seenNormalizedLabels[$normLabel])) {
+                    continue;
+                }
+
+                // 5. Ensure no field key is ever repeated across sources
                 if (isset($seenFieldKeys[$fKey])) {
                     continue;
                 }
 
                 $seenFieldKeys[$fKey] = true;
+                if (!empty($normLabel)) {
+                    $seenNormalizedLabels[$normLabel] = true;
+                }
                 $fMeta['source_key'] = $k;
                 $fMeta['source_label'] = $src['label'];
                 if (empty($fMeta['description'])) {
@@ -569,9 +631,33 @@ class ReportService
             ],
 
             // Overwrite joined tables whose single-source config had source-specific joins
+            'tbl_courses.course_status' => [
+                'raw_select' => "(CASE WHEN tbl_assignedusers.status = 3 THEN 'Completed' WHEN tbl_courses.expiration_date IS NOT NULL AND tbl_courses.expiration_date < NOW() AND tbl_courses.expiration_date != '1970-01-01 00:00:00' THEN 'Expired' WHEN tbl_assignedusers.status = 1 THEN 'In Progress' ELSE 'Not Started' END)",
+                'filter_sql' => "(CASE WHEN tbl_assignedusers.status = 3 THEN 'Completed' WHEN tbl_courses.expiration_date IS NOT NULL AND tbl_courses.expiration_date < NOW() AND tbl_courses.expiration_date != '1970-01-01 00:00:00' THEN 'Expired' WHEN tbl_assignedusers.status = 1 THEN 'In Progress' ELSE 'Not Started' END)",
+            ],
+            'tbl_courses.active' => [
+                'raw_select' => "CASE WHEN tbl_courses.active = 1 THEN 'Active' ELSE 'Inactive' END",
+                'filter_sql' => "CASE WHEN tbl_courses.active = 1 THEN 'Active' ELSE 'Inactive' END",
+            ],
             'tbl_courses.course_name' => [
                 'raw_select' => "COALESCE(tbl_courses.course_name, '-')",
                 'filter_sql' => "tbl_courses.course_name",
+            ],
+            'tbl_courses.course_type' => [
+                'raw_select' => "CASE WHEN tbl_courses.parent_id IS NOT NULL AND tbl_courses.parent_id > 0 THEN 'Sub Course' ELSE 'Main Course' END",
+                'filter_sql' => "CASE WHEN tbl_courses.parent_id IS NOT NULL AND tbl_courses.parent_id > 0 THEN 'Sub Course' ELSE 'Main Course' END",
+            ],
+            'tbl_courses.parent_course_name' => [
+                'raw_select' => "COALESCE((SELECT p.course_name FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1), 'None (Main Course)')",
+                'filter_sql' => "(SELECT p.course_name FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1)",
+            ],
+            'tbl_courses.parent_course_code' => [
+                'raw_select' => "COALESCE((SELECT p.course_code FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1), '-')",
+                'filter_sql' => "(SELECT p.course_code FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1)",
+            ],
+            'tbl_courses.sub_courses_list' => [
+                'raw_select' => "COALESCE((SELECT GROUP_CONCAT(sc.course_name SEPARATOR ' || ') FROM tbl_courses as sc WHERE sc.parent_id = tbl_courses.id AND sc.deleted_at IS NULL AND (sc.is_delete IS NULL OR sc.is_delete = 0)), '—')",
+                'filter_sql' => "(SELECT GROUP_CONCAT(sc.course_name SEPARATOR ', ') FROM tbl_courses as sc WHERE sc.parent_id = tbl_courses.id AND sc.deleted_at IS NULL AND (sc.is_delete IS NULL OR sc.is_delete = 0))",
             ],
             'tbl_categories.category_name' => [
                 'raw_select' => "COALESCE(tbl_categories.category_name, 'General')",
@@ -604,6 +690,9 @@ class ReportService
                   ->whereNull('tbl_courses.deleted_at')
                   ->where(function ($q) {
                       $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                  })
+                  ->where(function ($q) {
+                      $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                   });
             })
             ->leftJoin('tbl_categories', 'tbl_categories.id', '=', 'tbl_courses.category_id')
@@ -696,15 +785,35 @@ class ReportService
             }
         }
 
-        // 5. Universal Course filter
+        // 5. Universal Course filter (with support for including child sub-courses)
         if (!empty($config['course_filter']) && $config['course_filter'] !== 'all' && $config['course_filter'] !== 'Total' && $config['course_filter'] !== '') {
             $courseVal = $config['course_filter'];
+            $includeSubcourses = !empty($config['include_subcourses']) && $config['include_subcourses'] != '0';
             if (is_numeric($courseVal)) {
-                $query->where('tbl_assignedusers.course_id', $courseVal);
+                if ($includeSubcourses) {
+                    $query->where(function ($q) use ($courseVal) {
+                        $q->where('tbl_assignedusers.course_id', $courseVal)
+                          ->orWhere('tbl_courses.parent_id', $courseVal);
+                    });
+                } else {
+                    $query->where('tbl_assignedusers.course_id', $courseVal);
+                }
             } else {
                 $query->where(function ($q) use ($courseVal) {
                     $q->where('tbl_courses.course_name', 'LIKE', "%{$courseVal}%")
                       ->orWhere('tbl_courses.course_code', 'LIKE', "%{$courseVal}%");
+                });
+            }
+        }
+
+        // Sub-Course / Course Scope Filter (all, main, sub)
+        if (!empty($config['course_type_filter']) && $config['course_type_filter'] !== 'all') {
+            $cType = strtolower(trim((string)$config['course_type_filter']));
+            if ($cType === 'sub' || $cType === 'sub_only' || $cType === 'sub course') {
+                $query->whereNotNull('tbl_courses.parent_id')->where('tbl_courses.parent_id', '>', 0);
+            } elseif ($cType === 'main' || $cType === 'main_only' || $cType === 'main course') {
+                $query->where(function ($q) {
+                    $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                 });
             }
         }
@@ -957,6 +1066,9 @@ class ReportService
             }
 
             if (!empty($selects)) {
+                $selects[] = "tbl_courses.parent_id as _meta_parent_id";
+                $selects[] = "(SELECT p.course_name FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1) as _meta_parent_course_name";
+                $selects[] = "(SELECT COUNT(*) FROM tbl_courses as sc WHERE sc.parent_id = tbl_courses.id AND sc.deleted_at IS NULL AND (sc.is_delete IS NULL OR sc.is_delete = 0)) as _meta_subcourses_count";
                 $query->selectRaw(implode(', ', $selects));
             }
         }
@@ -1075,6 +1187,9 @@ class ReportService
             $query->whereNull('tbl_courses.deleted_at')
                   ->where(function ($q) {
                       $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                  })
+                  ->where(function ($q) {
+                      $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                   });
         } elseif ($source['table'] === 'tbl_certificates') {
             $query->whereNull('tbl_certificates.deleted_at');
@@ -1085,6 +1200,9 @@ class ReportService
                       ->whereNull('tbl_courses.deleted_at')
                       ->where(function ($q) {
                           $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                      })
+                      ->where(function ($q) {
+                          $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                       });
             }
         } elseif ($source['table'] === 'tbl_course_documents_list') {
@@ -1094,6 +1212,9 @@ class ReportService
                       ->whereNull('tbl_courses.deleted_at')
                       ->where(function ($q) {
                           $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                      })
+                      ->where(function ($q) {
+                          $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                       });
             }
         }
@@ -1191,26 +1312,75 @@ class ReportService
             }
         }
 
-        // Filter by Course (Dropdown or Search)
+        // Filter by Course (Dropdown or Search) with sub-course inclusion
         if (!empty($config['course_filter']) && $config['course_filter'] !== 'all' && $config['course_filter'] !== 'Total' && $config['course_filter'] !== '') {
             $courseVal = $config['course_filter'];
+            $includeSubcourses = !empty($config['include_subcourses']) && $config['include_subcourses'] != '0';
             if (is_numeric($courseVal)) {
                 if ($sourceKey === 'courses') {
-                    $query->where('tbl_courses.id', $courseVal);
+                    if ($includeSubcourses) {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_courses.id', $courseVal)
+                              ->orWhere('tbl_courses.parent_id', $courseVal);
+                        });
+                    } else {
+                        $query->where('tbl_courses.id', $courseVal);
+                    }
                 } elseif ($sourceKey === 'feedback') {
-                    $query->where('tbl_employee_feedback_ratings.course_id', $courseVal);
+                    if ($includeSubcourses) {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_employee_feedback_ratings.course_id', $courseVal)
+                              ->orWhere('tbl_courses.parent_id', $courseVal);
+                        });
+                    } else {
+                        $query->where('tbl_employee_feedback_ratings.course_id', $courseVal);
+                    }
                 } elseif ($sourceKey === 'exams') {
-                    $query->where('tbl_courses.id', $courseVal);
+                    if ($includeSubcourses) {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_courses.id', $courseVal)
+                              ->orWhere('tbl_courses.parent_id', $courseVal);
+                        });
+                    } else {
+                        $query->where('tbl_courses.id', $courseVal);
+                    }
                 } elseif ($sourceKey === 'videos' || $sourceKey === 'assessments' || $sourceKey === 'enrollments') {
-                    $query->where(function ($q) use ($courseVal) {
-                        $q->where('tbl_courses.id', $courseVal)
-                          ->orWhere('tbl_assignedusers.course_id', $courseVal);
-                    });
+                    if ($includeSubcourses) {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_courses.id', $courseVal)
+                              ->orWhere('tbl_assignedusers.course_id', $courseVal)
+                              ->orWhere('tbl_courses.parent_id', $courseVal);
+                        });
+                    } else {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_courses.id', $courseVal)
+                              ->orWhere('tbl_assignedusers.course_id', $courseVal);
+                        });
+                    }
                 } else {
-                    $query->where('tbl_courses.id', $courseVal);
+                    if ($includeSubcourses) {
+                        $query->where(function ($q) use ($courseVal) {
+                            $q->where('tbl_courses.id', $courseVal)
+                              ->orWhere('tbl_courses.parent_id', $courseVal);
+                        });
+                    } else {
+                        $query->where('tbl_courses.id', $courseVal);
+                    }
                 }
             } else {
                 $query->where('tbl_courses.course_name', 'LIKE', "%{$courseVal}%");
+            }
+        }
+
+        // Filter by Course Scope / Type (All, Main Courses Only, Sub Courses Only)
+        if (!empty($config['course_type_filter']) && $config['course_type_filter'] !== 'all') {
+            $cType = strtolower(trim((string)$config['course_type_filter']));
+            if ($cType === 'sub' || $cType === 'sub_only' || $cType === 'sub course') {
+                $query->whereNotNull('tbl_courses.parent_id')->where('tbl_courses.parent_id', '>', 0);
+            } elseif ($cType === 'main' || $cType === 'main_only' || $cType === 'main course') {
+                $query->where(function ($q) {
+                    $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
+                });
             }
         }
 
@@ -1738,6 +1908,9 @@ class ReportService
                       ->whereNull('tbl_courses.deleted_at')
                       ->where(function ($q) {
                           $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                      })
+                      ->where(function ($q) {
+                          $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                       });
                 });
                 $query->leftJoin('tbl_categories', 'tbl_categories.id', '=', 'tbl_courses.category_id');
@@ -2011,6 +2184,12 @@ class ReportService
             if (empty($selects)) {
                 $selects = ["{$source['table']}.id as {$source['table']}__id"];
             }
+            if ($sourceKey === 'courses' || in_array('tbl_courses.course_name', $selectedFields) || isset($source['fields']['tbl_courses.course_name'])) {
+                $selects[] = "tbl_courses.id as _meta_course_id";
+                $selects[] = "tbl_courses.parent_id as _meta_parent_id";
+                $selects[] = "(SELECT p.course_name FROM tbl_courses as p WHERE p.id = tbl_courses.parent_id AND p.deleted_at IS NULL LIMIT 1) as _meta_parent_course_name";
+                $selects[] = "(SELECT COUNT(*) FROM tbl_courses as sc WHERE sc.parent_id = tbl_courses.id AND sc.deleted_at IS NULL AND (sc.is_delete IS NULL OR sc.is_delete = 0)) as _meta_subcourses_count";
+            }
             $query->selectRaw(implode(', ', $selects));
         }
 
@@ -2152,6 +2331,16 @@ class ReportService
         } elseif (is_string($sourceKey) && str_contains($sourceKey, ',')) {
             $sourceKey = array_filter(array_map('trim', explode(',', $sourceKey)));
         }
+
+        // When generating a courses report, ensure tbl_courses.course_name is always included as the primary anchor column
+        $isCoursesSource = ($sourceKey === 'courses') || (is_array($sourceKey) && count($sourceKey) === 1 && in_array('courses', $sourceKey));
+        if ($isCoursesSource) {
+            $currentSelected = $config['selected_fields'] ?? [];
+            if (!empty($currentSelected) && is_array($currentSelected) && !in_array('tbl_courses.course_name', $currentSelected)) {
+                array_unshift($config['selected_fields'], 'tbl_courses.course_name');
+            }
+        }
+
         $built = $this->buildQuery($sourceKey, $config);
 
         $query = $built['query'];
@@ -2319,6 +2508,9 @@ class ReportService
                       ->whereNull('tbl_courses.deleted_at')
                       ->where(function ($q) {
                           $q->whereNull('tbl_courses.is_delete')->orWhere('tbl_courses.is_delete', 0);
+                      })
+                      ->where(function ($q) {
+                          $q->whereNull('tbl_courses.parent_id')->orWhere('tbl_courses.parent_id', 0);
                       });
                 })
                 ->whereIn('tbl_assignedusers.course_id', $courseIds)
@@ -3404,6 +3596,73 @@ class ReportService
                         }
                         $val = implode('', $formattedItems);
                     }
+                    // Format Course Type badge (Main Course vs Sub Course)
+                    elseif ($f === 'tbl_courses.course_type') {
+                        $items = explode('<br>', (string)$val);
+                        $formattedItems = [];
+                        foreach ($items as $itemStr) {
+                            $strVal = strtolower(trim($itemStr));
+                            if ($strVal === 'sub course' || $strVal === 'sub') {
+                                $badgeHtml = '<span class="badge rounded-1 text-white shadow-none" style="background-color: #008080; display: inline-flex; align-items: center; justify-content: center; min-width: 90px; height: 24px; font-size: 11px; font-weight: 600;"><i class="fa-solid fa-code-branch me-1"></i>Sub Course</span>';
+                            } else {
+                                $badgeHtml = '<span class="badge rounded-1 bg-light text-dark border shadow-none" style="display: inline-flex; align-items: center; justify-content: center; min-width: 90px; height: 24px; font-size: 11px; font-weight: 500;"><i class="fa-solid fa-book text-secondary me-1"></i>Main Course</span>';
+                            }
+                            $formattedItems[] = '<div class="line-item-entry py-1 d-flex align-items-center justify-content-center" style="min-height: 28px;">' . $badgeHtml . '</div>';
+                        }
+                        $val = implode('', $formattedItems);
+                    }
+                    // Format Parent Course Name
+                    elseif ($f === 'tbl_courses.parent_course_name') {
+                        $pNameTrim = trim((string)$val);
+                        if ($pNameTrim === '' || $pNameTrim === '-' || strtolower($pNameTrim) === 'none (main course)') {
+                            $val = '<span class="text-muted font-smallsize">—</span>';
+                        } else {
+                            $val = '<div class="d-flex align-items-center"><i class="fa-solid fa-turn-up text-secondary me-1 fa-rotate-90" style="font-size: 11px; color: #008080;"></i><span class="fw-semibold text-dark font-smallsize">' . htmlspecialchars($pNameTrim) . '</span></div>';
+                        }
+                    }
+                    // Format Sub Courses List (for main courses that have child sub-courses)
+                    elseif ($f === 'tbl_courses.sub_courses_list') {
+                        $sValTrim = trim((string)$val);
+                        if ($sValTrim === '' || $sValTrim === '-' || $sValTrim === '—' || $sValTrim === 'None' || str_contains($sValTrim, 'â€”')) {
+                            $metaParent = trim((string)($item->_meta_parent_course_name ?? ''));
+                            if ($metaParent !== '' && $metaParent !== '-' && strtolower($metaParent) !== 'none (main course)') {
+                                $val = '<div class="d-flex align-items-center py-1"><span class="badge rounded-1 text-white shadow-none me-1" style="background-color: #008080; font-size: 9.5px; font-weight: 500; padding: 2px 6px;"><i class="fa-solid fa-code-branch me-1"></i>Sub Course of</span> <span class="fw-semibold text-dark font-smallsize">' . htmlspecialchars($metaParent) . '</span></div>';
+                            } else {
+                                $val = '<span class="text-muted font-smallsize">—</span>';
+                            }
+                        } else {
+                            $subNames = explode(' || ', $sValTrim);
+                            $htmlList = '<div class="d-flex flex-column gap-1 py-1">';
+                            foreach ($subNames as $subName) {
+                                $subNameClean = trim($subName);
+                                if (!empty($subNameClean) && $subNameClean !== '—' && !str_contains($subNameClean, 'â€”')) {
+                                    $htmlList .= '<div class="d-flex align-items-center"><span class="badge rounded-1 text-white shadow-none me-1" style="background-color: #008080; font-size: 9.5px; font-weight: 500; padding: 2px 6px;"><i class="fa-solid fa-code-branch me-1"></i>Sub Course</span> <span class="fw-semibold text-dark font-smallsize">' . htmlspecialchars($subNameClean) . '</span></div>';
+                                }
+                            }
+                            $htmlList .= '</div>';
+                            $val = $htmlList;
+                        }
+                    }
+                    // Format Course Name with Sub Course and Parent hierarchy indicators
+                    elseif ($f === 'tbl_courses.course_name') {
+                        $cNameStr = htmlspecialchars(trim((string)$val));
+                        $metaParent = trim((string)($item->_meta_parent_course_name ?? ''));
+                        $metaSubCount = (int)($item->_meta_subcourses_count ?? 0);
+                        
+                        if ($metaParent !== '' && $metaParent !== '-' && strtolower($metaParent) !== 'none (main course)') {
+                            $val = '<div class="line-item-entry py-1">'
+                                 . '<div class="fw-semibold text-dark font-smallsize"><i class="fa-solid fa-code-branch text-teal me-1" style="color: #008080; font-size: 11px;"></i>' . $cNameStr . '</div>'
+                                 . '<div class="text-muted font-smallsize mt-0" style="font-size: 10.5px; font-weight: normal;"><i class="fa-solid fa-turn-up text-secondary me-1 fa-rotate-90" style="color: #008080;"></i>Parent Course: <span class="fw-semibold text-dark">' . htmlspecialchars($metaParent) . '</span></div>'
+                                 . '</div>';
+                        } elseif ($metaSubCount > 0) {
+                            $val = '<div class="line-item-entry py-1">'
+                                 . '<div class="fw-semibold text-dark font-smallsize"><i class="fa-solid fa-book text-secondary me-1" style="font-size: 11px;"></i>' . $cNameStr . '</div>'
+                                 . '<div class="mt-0"><span class="badge text-white font-smallsize" style="background-color: #008080; font-size: 9.5px; font-weight: 500; padding: 2px 6px;"><i class="fa-solid fa-sitemap me-1"></i>' . $metaSubCount . ' Sub Course' . ($metaSubCount > 1 ? 's' : '') . '</span></div>'
+                                 . '</div>';
+                        } else {
+                            $val = '<div class="line-item-entry py-1"><span class="fw-semibold text-dark font-smallsize"><i class="fa-solid fa-book text-secondary me-1" style="font-size: 11px;"></i>' . $cNameStr . '</span></div>';
+                        }
+                    }
                     // Format Assessment / Exam Name
                     elseif ($f === 'tbl_course_documents_list.file_name' || $f === 'tbl_assignment_exams.name') {
                         $items = explode('<br>', (string)$val);
@@ -3524,11 +3783,18 @@ class ReportService
                     $row[] = $val;
                 }
 
-                // Global logical deduplication across entire report to prevent duplicate rows when learner column is omitted (excluding S.No)
-                $dataCols = array_slice($row, 1);
-                $rowKey = md5(json_encode(array_map(function ($c) {
-                    return $this->cleanCellForExport($c);
-                }, $dataCols)));
+                // Logical deduplication across entire report to prevent duplicate rows
+                $isCoursesSource = ($sourceKey === 'courses') || (is_array($sourceKey) && count($sourceKey) === 1 && in_array('courses', $sourceKey));
+                if ($isCoursesSource) {
+                    // For courses report, each distinct course entity is its own record and should never be collapsed
+                    $courseIdKey = $cId > 0 ? $cId : ($item->tbl_courses__id ?? ($item->_meta_course_id ?? ($item->id ?? null)));
+                    $rowKey = 'course_' . ($courseIdKey ?: md5(json_encode($row)));
+                } else {
+                    $dataCols = array_slice($row, 1);
+                    $rowKey = md5(($cId > 0 ? ($cId . '_') : '') . json_encode(array_map(function ($c) {
+                        return $this->cleanCellForExport($c);
+                    }, $dataCols)));
+                }
                 if (isset($seenRowKeys[$rowKey])) {
                     continue;
                 }
