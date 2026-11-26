@@ -153,11 +153,39 @@ $loginCounts = array_values($counts);
 
         $todayStr = Carbon::today()->toDateString();
 
+        // Sync assignment status so DB reflects actual assessment/assignment passing results
+        $preloadedResults = Assessment_results::where('user_id', $user->id)->whereNull('deleted_at')->get();
+        $preloadedExamAttempts = ExamAttempt::where('user_id', $user->id)->get();
+        $candidateDocIds = $preloadedResults->pluck('course_document_id')->filter()->unique();
+        $candidateCourseIds = array_unique(array_merge(
+            Course_documents::whereIn('id', $candidateDocIds)->pluck('course_id')->filter()->unique()->toArray(),
+            $preloadedExamAttempts->pluck('course_id')->filter()->unique()->toArray()
+        ));
+
+        $userAssignsToHeal = AsignedUser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', $user->id)
+            ->where(function($q) use ($candidateCourseIds) {
+                $q->where('status', 3);
+                if (!empty($candidateCourseIds)) {
+                    $q->orWhereIn('course_id', $candidateCourseIds);
+                }
+            })
+            ->get();
+        foreach ($userAssignsToHeal as $uAssign) {
+            $passed = $uAssign->isCompletedAndPassed($preloadedResults, $preloadedExamAttempts);
+            if ($passed && (int)$uAssign->status !== 3) {
+                $uAssign->update(['status' => 3]);
+            } elseif (!$passed && (int)$uAssign->status === 3) {
+                $uAssign->update(['status' => 1]);
+            }
+        }
+
         $baseAssigned = AsignedUser::has('course_details')
             ->has('category_details')
             ->where('user_id', $user->id)
             ->whereHas('course_details', function($q) {
-                $q->where('course_type', 1);
+                $q->where('course_type', 1)->whereNull('parent_id');
             });
 
         if (!empty($request->category_id)) {
@@ -436,7 +464,36 @@ foreach ($activities_data as $activity) {
     }
     public function user_courses(Request $request)
     {
+        // Sync assignment status so DB reflects actual assessment/assignment passing results
+        $preloadedResults = Assessment_results::where('user_id', Auth::user()->id)->whereNull('deleted_at')->get();
+        $preloadedExamAttempts = ExamAttempt::where('user_id', Auth::user()->id)->get();
+        $candidateDocIds = $preloadedResults->pluck('course_document_id')->filter()->unique();
+        $candidateCourseIds = array_unique(array_merge(
+            Course_documents::whereIn('id', $candidateDocIds)->pluck('course_id')->filter()->unique()->toArray(),
+            $preloadedExamAttempts->pluck('course_id')->filter()->unique()->toArray()
+        ));
+
+        $userAssignsToHeal = Asigneduser::has('course_details')
+            ->has('category_details')
+            ->where('user_id', Auth::user()->id)
+            ->where(function($q) use ($candidateCourseIds) {
+                $q->where('status', 3);
+                if (!empty($candidateCourseIds)) {
+                    $q->orWhereIn('course_id', $candidateCourseIds);
+                }
+            })
+            ->get();
+        foreach ($userAssignsToHeal as $uAssign) {
+            $passed = $uAssign->isCompletedAndPassed($preloadedResults, $preloadedExamAttempts);
+            if ($passed && (int)$uAssign->status !== 3) {
+                $uAssign->update(['status' => 3]);
+            } elseif (!$passed && (int)$uAssign->status === 3) {
+                $uAssign->update(['status' => 1]);
+            }
+        }
+
         $list = Asigneduser::has('course_details')->has('category_details')->where('user_id',Auth::user()->id)->whereHas('course_details',function($q) use($request){
+            $q->whereNull('parent_id');
             // $q->whereDate('expiration_date','>=',date('Y-m-d'));
             if(!empty($request->search)){
                 $q->where('course_name','like', '%' . $request->search . '%');
@@ -467,7 +524,13 @@ foreach ($activities_data as $activity) {
             }
            
 
-        })->with(['course_details', 'category_details', 'bookmark_data']);
+        })->with([
+            'course_details.sub_courses' => function($q) {
+                $q->where('active', 1)->where('is_delete', 0)->with(['assessments', 'category_details']);
+            },
+            'category_details',
+            'bookmark_data'
+        ]);
 
         if ($request->menu == 'bookmarked' || $request->bookmark == 1) {
             $list = $list->has('bookmark_data'); 
@@ -527,15 +590,17 @@ foreach ($activities_data as $activity) {
         $category_list=Category::whereHas('category_assigned_cousers')->get();
 
         $category_view = Category::with(['category_assigned_cousers'=>function($q){
-            $q->where('user_id',Auth::user()->id);
+            $q->where('user_id',Auth::user()->id)->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
         }])->whereHas('category_assigned_cousers', function ($query) {
                        $query->where('user_id', Auth::user()->id);
                             $query->where('status','!=',3);
+                            $query->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
                      })->where(function($q) use($request){
             if(!empty($request->category_id)){
                 $q->where('id',$request->category_id);
             }
         })->whereHas('category_assigned_cousers.course_details', function ($q) use($request) {
+            $q->whereNull('parent_id');
 
              if(!empty($request->due_by)){
                 $date=date('Y-m-d');
@@ -555,20 +620,20 @@ foreach ($activities_data as $activity) {
         $countlist = Asigneduser::has('course_details')->has('category_details')
             ->where('user_id', Auth::id())
             ->whereHas('course_details', function ($q) {
-                $q->where('course_type', 1);
+                $q->where('course_type', 1)->whereNull('parent_id');
             })
             ->with(['course_details', 'category_details'])
             ->get();
         // dd($countlist);
 
 
-    $assigned_category_ids = Asigneduser::where('user_id', Auth::id())
+        $assigned_category_ids = Asigneduser::where('user_id', Auth::id())
         ->whereNotNull('category_id')
         ->pluck('category_id')
         ->unique();
         // dd($assigned_category_ids);
 
-    $feedback_ratings = FeedbackRatingsSetting::where('is_active', 1)
+        $feedback_ratings = FeedbackRatingsSetting::where('is_active', 1)
         ->where('type', 2)
         ->whereIn('category_id', $assigned_category_ids)
         ->whereHas('category', function ($q) {
@@ -579,16 +644,19 @@ foreach ($activities_data as $activity) {
         })
         ->get();
 
-    // dd($feedback_ratings);
+        // dd($feedback_ratings);
 
         
          return view('user.courses.index',compact('list','courses_data','category_list','category_view','request','countlist','feedback_ratings'));
     }
     public function get_assign_course_data(Request $request)
     {
-       $courses_data = Asigneduser::with([
+        $courses_data = Asigneduser::with([
             'course_details.assessments' => function ($q) {
                 $q->where('is_active', 1);
+            },
+            'course_details.sub_courses' => function ($q) {
+                $q->where('active', 1)->where('is_delete', 0);
             }
         ])
         ->has('course_details')
@@ -596,6 +664,35 @@ foreach ($activities_data as $activity) {
         ->where('user_id', Auth::id())
         ->where('id', $request->assign_id)
         ->first();
+
+        if (!$courses_data) {
+            return '';
+        }
+
+        // If a specific sub-course was selected, load that sub-course's data instead
+        if ($request->filled('course_id') && (int)$request->course_id !== (int)$courses_data->course_id) {
+            $selectedCourseId = (int)$request->course_id;
+            $subCourse = Courses::with([
+                'assessments' => function ($q) {
+                    $q->where('is_active', 1)->where('is_delete', 0);
+                },
+                'documents_details',
+                'category_details',
+                'parent_course',
+                'goal_details',
+                'training_details.userdetails'
+            ])
+            ->where('id', $selectedCourseId)
+            ->where('parent_id', $courses_data->course_id)
+            ->where('is_delete', 0)
+            ->first();
+
+            if ($subCourse) {
+                $courses_data->setRelation('course_details', $subCourse);
+                $courses_data->course_id = $subCourse->id;
+                $courses_data->category_id = $subCourse->category_id ?: $courses_data->category_id;
+            }
+        }
 
 
         //  dd($courses_data);
@@ -640,17 +737,37 @@ foreach ($activities_data as $activity) {
 
          $assessmentResults = Assessment_results::where('user_id', Auth::id())
              ->where(function($q) use ($courses_data, $courseDocIds) {
-                 $q->where('assign_id', $courses_data->id)
-                   ->orWhereIn('course_document_id', $courseDocIds);
+                 if ($courses_data->id) {
+                     $q->where('assign_id', $courses_data->id);
+                 }
+                 if ($courseDocIds->isNotEmpty()) {
+                     $q->orWhere(function($subQ) use ($courseDocIds, $courses_data) {
+                         $subQ->whereIn('course_document_id', $courseDocIds);
+                         if ($courses_data->id) {
+                             $subQ->where(function($aQ) use ($courses_data) {
+                                 $aQ->whereNull('assign_id')
+                                    ->orWhere('assign_id', 0)
+                                    ->orWhere('assign_id', $courses_data->id);
+                             });
+                         }
+                     });
+                 }
+                 if (!$courses_data->id && $courseDocIds->isEmpty()) {
+                     $q->where('course_document_id', -1);
+                 }
              })
              ->whereNull('deleted_at')
              ->orderBy('id', 'asc')
              ->get();
 
          $examAttempts = ExamAttempt::where('user_id', Auth::id())
+             ->where('course_id', $courses_data->course_id)
              ->where(function($q) use ($courses_data) {
-                 $q->where('assigned_id', $courses_data->id)
-                   ->orWhere('course_id', $courses_data->course_id);
+                 if ($courses_data->id) {
+                     $q->where('assigned_id', $courses_data->id)
+                       ->orWhereNull('assigned_id')
+                       ->orWhere('assigned_id', 0);
+                 }
              })
              ->orderBy('id', 'asc')
              ->get();
@@ -726,29 +843,29 @@ foreach ($activities_data as $activity) {
              $lastAccessedFormatted = 'Not Yet Accessed';
          }
 
-         // 2. Assessments: No. of Attempts, Passed / Failed / Not Attempted, Highest & Lowest Score (Take latest up to 3 valid attempts)
-         $rawAttemptCount = $assessmentResults->count() + $examAttempts->count();
+         // 2. Assessments: No. of Attempts, Passed / Failed / Not Attempted, Highest & Lowest Score (Take latest up to 3 valid assessment attempts)
+         $rawAttemptCount = $assessmentResults->count();
          $attemptCount = min(3, $rawAttemptCount);
 
          $latestAssessmentResults = $assessmentResults->count() > 3 ? $assessmentResults->slice(-3)->values() : $assessmentResults;
          $latestExamAttempts = $examAttempts->count() > 3 ? $examAttempts->slice(-3)->values() : $examAttempts;
 
          // Check if course has active assessments (type 6) or active assignments (type 7)
-         $activeAssessments = Course_documents::where('course_id', $courses_data->course_id)
-             ->where('type', 6)
+         $allCourseDocsRaw = Course_documents::where('course_id', $courses_data->course_id)
              ->where('is_delete', 0)
-             ->where(function ($q) {
-                 $q->where('is_active', 1)->orWhereNull('is_active');
-             })
              ->get();
 
-         $activeAssignments = Course_documents::where('course_id', $courses_data->course_id)
-             ->where('type', 7)
-             ->where('is_delete', 0)
-             ->where(function ($q) {
-                 $q->where('is_active', 1)->orWhereNull('is_active');
+         $activeAssessments = $allCourseDocsRaw->where('type', 6)
+             ->filter(function ($d) {
+                 return (int)($d->is_active ?? 1) === 1;
              })
-             ->get();
+             ->values();
+
+         $activeAssignments = $allCourseDocsRaw->where('type', 7)
+             ->filter(function ($d) {
+                 return (int)($d->is_active ?? 1) === 1;
+             })
+             ->values();
 
          $hasAssess = $activeAssessments->isNotEmpty();
          $hasAssign = $activeAssignments->isNotEmpty();
@@ -758,7 +875,24 @@ foreach ($activities_data as $activity) {
              $allAssessPassed = true;
              if ($hasAssess) {
                  foreach ($activeAssessments as $assess) {
-                     $passed = $assessmentResults->where('course_document_id', $assess->id)->contains(function($res) {
+                     $aRes = $assessmentResults->where('course_document_id', $assess->id);
+                     if ($aRes->isEmpty()) {
+                         $matchedDocIds = $allCourseDocsRaw->where('type', 6)
+                             ->filter(function($d) use ($assess) {
+                                 return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                             })
+                             ->pluck('id')
+                             ->toArray();
+                         $aRes = $assessmentResults->filter(function($r) use ($matchedDocIds) {
+                             return in_array($r->course_document_id, $matchedDocIds);
+                         })->values();
+
+                         if ($aRes->isEmpty()) {
+                             $aRes = $assessmentResults;
+                         }
+                     }
+                     $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+                     $passed = $aLatest->contains(function($res) {
                          if (method_exists($res, 'hasPassed') && $res->hasPassed()) {
                              return true;
                          }
@@ -829,7 +963,7 @@ foreach ($activities_data as $activity) {
                  $status = 'Passed';
              } else {
                  $pf = strtolower(trim((string)($details['pass_or_fail'] ?? '')));
-                 if ($pf === 'passed') {
+                 if ($pf === 'passed' || (isset($details['percentage'], $details['cutoff']) && (float)$details['percentage'] >= (float)$details['cutoff'])) {
                      $status = 'Passed';
                  }
              }
@@ -851,7 +985,6 @@ foreach ($activities_data as $activity) {
              $score = null;
              if (isset($att->percentage) && is_numeric($att->percentage)) {
                  $score = round((float)$att->percentage, 1);
-                 $scores[] = $score;
              }
              $status = ucfirst(strtolower(trim($att->exam_result ?? 'Pending')));
 
@@ -885,14 +1018,37 @@ foreach ($activities_data as $activity) {
          $highestScore = !empty($scores) ? max($scores) . '%' : '-';
          $lowestScore = !empty($scores) ? min($scores) . '%' : '-';
 
-         // 3. Build per-assessment dropdown options if course has multiple assessments/assignments
+         // Build per-assessment dropdown & stats (synchronized with Admin Reports tab)
          $assessmentOptions = [];
          $assessmentOptionsMap = [];
 
+         $nameCounts = [];
+         foreach ($activeAssessments as $doc) {
+             $n = !empty($doc->file_name) ? trim($doc->file_name) : 'Assessment';
+             $nameCounts[$n] = ($nameCounts[$n] ?? 0) + 1;
+         }
+         $seenNames = [];
+
          foreach ($activeAssessments as $idx => $assess) {
              $aRes = $assessmentResults->where('course_document_id', $assess->id);
-             $aCount = min(3, $aRes->count());
-             $aIsPassed = $aRes->contains(function($r) {
+             if ($aRes->isEmpty()) {
+                 $matchedDocIds = $allCourseDocsRaw->where('type', 6)
+                     ->filter(function($d) use ($assess) {
+                         return $d->id == $assess->id || trim(strtolower($d->file_name)) === trim(strtolower($assess->file_name));
+                     })
+                     ->pluck('id')
+                     ->toArray();
+                 $aRes = $assessmentResults->filter(function($r) use ($matchedDocIds) {
+                     return in_array($r->course_document_id, $matchedDocIds);
+                 })->values();
+
+                 if ($aRes->isEmpty()) {
+                     $aRes = $assessmentResults;
+                 }
+             }
+             $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
+             $aCount = $aLatest->count();
+             $aIsPassed = $aLatest->contains(function($r) {
                  if (method_exists($r, 'hasPassed') && $r->hasPassed()) return true;
                  $payload = json_decode($r->result_data ?? '', true);
                  $details = $payload['results'] ?? json_decode($r->results ?? '', true);
@@ -901,7 +1057,6 @@ foreach ($activities_data as $activity) {
              });
 
              $aScores = [];
-             $aLatest = $aRes->count() > 3 ? $aRes->slice(-3)->values() : $aRes;
              foreach ($aLatest as $r) {
                  $payload = json_decode($r->result_data ?? '', true);
                  $details = $payload['results'] ?? json_decode($r->results ?? '', true);
@@ -922,7 +1077,17 @@ foreach ($activities_data as $activity) {
 
              $aStatus = $aIsPassed ? 'Passed' : ($aCount > 0 ? 'Failed' : 'Not Attempted');
              $aKey = 'assess_' . $assess->id;
-             $aName = !empty($assess->file_name) ? $assess->file_name : ('Assessment ' . ($idx + 1));
+             $baseName = !empty($assess->file_name) ? trim($assess->file_name) : ('Assessment ' . ($idx + 1));
+             if (($nameCounts[$baseName] ?? 0) > 1) {
+                 if ((int)($assess->is_active ?? 0) === 1) {
+                     $aName = $baseName . ' (Active)';
+                 } else {
+                     $seenNames[$baseName] = ($seenNames[$baseName] ?? 0) + 1;
+                     $aName = $baseName . ' (v' . $seenNames[$baseName] . ')';
+                 }
+             } else {
+                 $aName = $baseName;
+             }
 
              $optData = [
                  'key' => $aKey,
@@ -937,46 +1102,11 @@ foreach ($activities_data as $activity) {
              $assessmentOptionsMap[$aKey] = $optData;
          }
 
-         if ($hasAssign) {
-             $uniqueExamCodes = $activeAssignments->pluck('file_path')->filter()->unique();
-             foreach ($uniqueExamCodes as $examCode) {
-                 $exam = Exam::where('exam_code', $examCode)->first();
-                 $examName = $exam && !empty($exam->name) ? $exam->name : $examCode;
-                 $examId = $exam ? $exam->id : 0;
-                 $eAtts = $examAttempts->where('exam_id', $examId);
-                 $eCount = min(3, $eAtts->count());
-                 $eIsPassed = $eAtts->contains(fn($a) => strtolower(trim($a->exam_result ?? '')) === 'passed');
-
-                 $eScores = [];
-                 $eLatest = $eAtts->count() > 3 ? $eAtts->slice(-3)->values() : $eAtts;
-                 foreach ($eLatest as $a) {
-                     if (isset($a->percentage) && is_numeric($a->percentage)) {
-                         $eScores[] = round((float)$a->percentage, 1);
-                     }
-                 }
-
-                 $eStatus = $eIsPassed ? 'Passed' : ($eCount > 0 ? 'Failed' : 'Not Attempted');
-                 $eKey = 'exam_' . $examId;
-
-                 $optData = [
-                     'key' => $eKey,
-                     'name' => $examName,
-                     'type' => 'Assignment',
-                     'attempts' => $eCount,
-                     'status' => $eStatus,
-                     'highest_score' => !empty($eScores) ? max($eScores) . '%' : '-',
-                     'lowest_score' => !empty($eScores) ? min($eScores) . '%' : '-',
-                 ];
-                 $assessmentOptions[] = $optData;
-                 $assessmentOptionsMap[$eKey] = $optData;
-             }
-         }
-
          $firstAssess = !empty($assessmentOptions) ? $assessmentOptions[0] : null;
-         $displayAttemptCount = $firstAssess ? $firstAssess['attempts'] : $attemptCount;
-         $displayPassedIn = $firstAssess ? $firstAssess['status'] : $passedInAttempt;
-         $displayHighestScore = $firstAssess ? $firstAssess['highest_score'] : $highestScore;
-         $displayLowestScore = $firstAssess ? $firstAssess['lowest_score'] : $lowestScore;
+         $displayAttemptCount = $firstAssess ? $firstAssess['attempts'] : ($hasAssess ? $attemptCount : 0);
+         $displayPassedIn = $firstAssess ? $firstAssess['status'] : ($hasAssess ? $passedInAttempt : 'No Assessment');
+         $displayHighestScore = $firstAssess ? $firstAssess['highest_score'] : ($hasAssess ? $highestScore : '-');
+         $displayLowestScore = $firstAssess ? $firstAssess['lowest_score'] : ($hasAssess ? $lowestScore : '-');
 
          $hasMultipleAssessments = count($assessmentOptions) > 1;
 
@@ -1008,7 +1138,7 @@ foreach ($activities_data as $activity) {
     public function category_courses(Request $request)
     {
         $category_view = Category::with(['category_assigned_cousers'=>function($q){
-            $q->where('user_id',Auth::user()->id);
+            $q->where('user_id',Auth::user()->id)->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
         }])->whereHas('category_assigned_cousers', function ($query) {
                        $query->where('user_id', Auth::user()->id);
                      })->where('id',$request->id)->first();
@@ -1016,26 +1146,59 @@ foreach ($activities_data as $activity) {
     }
     public function start_course(Request $request)
     {
-
-        //   $courses_data = Asigneduser::has('course_details')->with(['course_details.assessments'=>function($q){
-        //       $q->where('is_delete',0);
-        //       }])->has('category_details')->where('user_id',Auth::user()->id)->where('id',$request->id)->orderBy('id','desc')->first();
             $courses_data = Asigneduser::with([
-                    'course_details.assessments',
+                    'course_details.assessments.assessment_all_results',
+                    'course_details.assignment_exam.assignment_exam_name',
+                    'course_details.only_attachments',
+                    'course_details.only_scorm',
+                    'course_details.other_videos',
+                    'course_details.goal_details',
+                    'course_details.sub_courses' => function ($q) {
+                        $q->where('active', 1)->where('is_delete', 0)->with([
+                            'assessments.assessment_all_results',
+                            'assignment_exam.assignment_exam_name',
+                            'only_attachments',
+                            'only_scorm',
+                            'other_videos',
+                            'goal_details',
+                        ]);
+                    },
                     'category_details'
                 ])
                 ->where('user_id', Auth::id())
                 ->where('id', $request->id)
             ->firstOrFail();
           abort_unless($courses_data->course_details && $courses_data->category_details, 404, 'Course details are unavailable.');
+
+          // Support active sub-course selection
+          $active_sub_course = null;
+          $courseId = $request->input('course_id') ?: $request->input('sub_course_id');
+          if (!empty($courseId)) {
+              $active_sub_course = Courses::where('id', $courseId)
+                  ->where('parent_id', $courses_data->course_details->id)
+                  ->where('active', 1)
+                  ->where('is_delete', 0)
+                  ->with([
+                      'assessments.assessment_all_results',
+                      'assignment_exam.assignment_exam_name',
+                      'only_attachments',
+                      'only_scorm',
+                      'other_videos',
+                      'goal_details',
+                  ])
+                  ->first();
+          }
+
+          $displayed_course = $active_sub_course ?? $courses_data->course_details;
+
           $category_courses = Asigneduser::has('course_details')->has('category_details')->where('user_id',Auth::user()->id)->where('id','!=',$request->id)->where('category_id',$courses_data->category_id??0)->orderBy('id','desc')->get();
           Recently_view::updateOrCreate(['assign_id'=>$request->id,'user_id'=>Auth::user()->id],['view_time'=>now()]);
           if($courses_data->status !=3){
 
               if($courses_data->status ==0){
-               ActivityLog::log(auth()->user(), 'Started a course: ' . $courses_data->course_details->course_name,0);
+               ActivityLog::log(auth()->user(), 'Started a course: ' . $displayed_course->course_name,0);
               }else{
-               ActivityLog::log(auth()->user(), 'Resumed a course: ' . $courses_data->course_details->course_name,0);
+               ActivityLog::log(auth()->user(), 'Resumed a course: ' . $displayed_course->course_name,0);
 
               }
 
@@ -1045,7 +1208,7 @@ foreach ($activities_data as $activity) {
           }
 
 
-          foreach ($courses_data->course_details->only_scorm as $key => $value) {
+          foreach ($displayed_course->only_scorm as $key => $value) {
               if(!file_exists(storage_path('app/public/scrom_videos/'.$value->id.'/story.html')) && file_exists(storage_path('app/public/'.$value->file_path))){
                 if(!file_exists(storage_path('app/public/scrom_videos/'.$value->id))){
                 mkdir(storage_path('app/public/scrom_videos/'.$value->id),0777); }
@@ -1065,12 +1228,12 @@ foreach ($activities_data as $activity) {
                 $scorm_data = ['student_name'=>Auth::user()->first_name,'student_id'=>Auth::user()->id,'suspend_data'=>'','total_time'=>'','lesson_location'=>'','lesson_status'=>'incomplete','datafromlms'=>'','score_raw'=>'','commit_url'=>url('update_scorm_progress')."?id=".$request->id,'entry'=>'resume','course_id'=>$request->id];
             }
 
-          $scormDocument = $courses_data->course_details->only_scorm->first();
+          $scormDocument = $displayed_course->only_scorm->first();
           if ($scormDocument) {
               $scorm_data['commit_url'] .= '&document_id=' . $scormDocument->id;
           }
 
-          $requiredAssessmentVideoIds = $this->requiredAssessmentVideoIds($courses_data->course_id);
+          $requiredAssessmentVideoIds = $this->requiredAssessmentVideoIds($displayed_course->id);
           $assessmentVideoAccessGranted = $this->hasCompletedAllRequiredVideos(
               $courses_data->id,
               Auth::id(),
@@ -1083,7 +1246,9 @@ foreach ($activities_data as $activity) {
              'scorm_data',
              'scormProgressByDocument',
              'requiredAssessmentVideoIds',
-             'assessmentVideoAccessGranted'
+             'assessmentVideoAccessGranted',
+             'active_sub_course',
+             'displayed_course'
          ));
     }
     public function activity(Request $request)
@@ -1166,8 +1331,12 @@ foreach ($activities_data as $activity) {
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $validCourseIds = Courses::where('id', $assignment->course_id)
+                ->orWhere('parent_id', $assignment->course_id)
+                ->pluck('id');
+
             $assessment = Course_documents::where('id', $validated['assessment_id'])
-                ->where('course_id', $assignment->course_id)
+                ->whereIn('course_id', $validCourseIds)
                 ->where('type', 6)
                 ->where('is_active', 1)
                 ->where('is_delete', 0)
@@ -1193,7 +1362,7 @@ foreach ($activities_data as $activity) {
                 return response()->json(['message' => 'This assessment is already completed.'], 422);
             }
 
-            $requiredVideoIds = $this->requiredAssessmentVideoIds($assignment->course_id);
+            $requiredVideoIds = $this->requiredAssessmentVideoIds($assessment->course_id);
             if (!$this->hasCompletedAllRequiredVideos($assignment->id, Auth::id(), $requiredVideoIds)) {
                     return response()->json([
                         'message' => 'Watch every course video completely before taking an assessment.',
@@ -1236,7 +1405,20 @@ foreach ($activities_data as $activity) {
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $requiredIds = $this->requiredAssessmentVideoIds($assignment->course_id);
+            $validCourseIds = Courses::where('id', $assignment->course_id)
+                ->orWhere('parent_id', $assignment->course_id)
+                ->pluck('id');
+
+            $requiredIds = Course_documents::whereIn('course_id', $validCourseIds)
+                ->where('is_active', 1)
+                ->where('is_delete', 0)
+                ->where(function ($query) {
+                    $query->where('type', 4)
+                        ->orWhereNotIn('type', [4, 5, 6, 7]);
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
 
             abort_unless($requiredIds->contains($documentId), 422, 'This video is not required for the assigned course.');
 
@@ -1487,6 +1669,33 @@ public function fetch_myteam_userdetails(Request $request)
 {
     $user = User::findOrFail($request->user_id);
 
+    // Sync assignment status so DB reflects actual assessment/assignment passing results
+    $preloadedResults = Assessment_results::where('user_id', $user->id)->whereNull('deleted_at')->get();
+    $preloadedExamAttempts = ExamAttempt::where('user_id', $user->id)->get();
+    $candidateDocIds = $preloadedResults->pluck('course_document_id')->filter()->unique();
+    $candidateCourseIds = array_unique(array_merge(
+        Course_documents::whereIn('id', $candidateDocIds)->pluck('course_id')->filter()->unique()->toArray(),
+        $preloadedExamAttempts->pluck('course_id')->filter()->unique()->toArray()
+    ));
+
+    $userAssignsToHeal = AsignedUser::has('course_details')
+        ->where('user_id', $user->id)
+        ->where(function($q) use ($candidateCourseIds) {
+            $q->where('status', 3);
+            if (!empty($candidateCourseIds)) {
+                $q->orWhereIn('course_id', $candidateCourseIds);
+            }
+        })
+        ->get();
+    foreach ($userAssignsToHeal as $uAssign) {
+        $passed = $uAssign->isCompletedAndPassed($preloadedResults, $preloadedExamAttempts);
+        if ($passed && (int)$uAssign->status !== 3) {
+            $uAssign->update(['status' => 3]);
+        } elseif (!$passed && (int)$uAssign->status === 3) {
+            $uAssign->update(['status' => 1]);
+        }
+    }
+
     // All counts in ONE query incorporating status codes (0=Pending, 1=In-progress, 2=Not attend, 3=Completed)
     $counts = AsignedUser::leftJoin('tbl_courses', 'tbl_courses.id', '=', 'tbl_assignedusers.course_id')
         ->where('tbl_assignedusers.user_id', $user->id)
@@ -1504,36 +1713,87 @@ public function fetch_myteam_userdetails(Request $request)
     $pending_count    = $counts->pending_count;
     $instructor_lead  = $counts->instructor_lead;
 
-    // Assessments with all needed relations eager loaded safely
+    // Assessments with all needed relations eager loaded safely including sub-courses
     $assessments = AsignedUser::where('user_id', $user->id)
         ->whereHas('course_details', function ($q) {
             $q->where('course_type', 1);
         })
         ->with([
-            'course_details.assessments' => fn($q) => $q->where('is_active', 1),
+            'course_details.assessments' => fn($q) => $q->where('is_active', 1)->where('is_delete', 0)->whereNotNull('file_name')->where('file_name', '!=', ''),
             'course_details.assignment_exam.assignment_exam_name',
+            'course_details.category_details',
+            'course_details.parent_course',
+            'course_details.sub_courses' => function($sq) {
+                $sq->where('is_delete', 0)->with([
+                    'assessments' => fn($q) => $q->where('is_active', 1)->where('is_delete', 0)->whereNotNull('file_name')->where('file_name', '!=', ''),
+                    'assignment_exam.assignment_exam_name',
+                    'category_details',
+                    'parent_course'
+                ]);
+            }
         ])
         ->get();
 
-    // Pull ALL assessment results for multiple attempts, sorted by latest first
-    $assessmentIds = $assessments->flatMap(fn($a) => optional($a->course_details)->assessments ? $a->course_details->assessments->pluck('id') : [])->unique();
-    
-    $allResults = \App\Models\Assessment_results::where('user_id', $user->id)
-        ->whereIn('course_document_id', $assessmentIds)
-        ->orderBy('id', 'desc') // Get latest attempt first
+    $userAssignedSubcourses = AsignedUser::where('user_id', $user->id)->get()->keyBy('course_id');
+    $parentCourseIdsInAssessments = $assessments->pluck('course_id')->toArray();
+
+    // Pull ALL assessment results for multiple attempts, sorted by latest first (including sub-courses)
+    $allAssessmentsList = collect();
+    $allExamsList = collect();
+    $allCourseIds = collect();
+
+    foreach ($assessments as $a) {
+        if ($a->course_details) {
+            $allCourseIds->push($a->course_details->id);
+            if ($a->course_details->assessments) {
+                $allAssessmentsList = $allAssessmentsList->concat($a->course_details->assessments);
+            }
+            if ($a->course_details->assignment_exam) {
+                $allExamsList = $allExamsList->concat($a->course_details->assignment_exam->map(fn($e) => optional($e->assignment_exam_name)->id));
+            }
+            if ($a->course_details->sub_courses) {
+                foreach ($a->course_details->sub_courses as $sc) {
+                    $allCourseIds->push($sc->id);
+                    if ($sc->assessments) {
+                        $allAssessmentsList = $allAssessmentsList->concat($sc->assessments);
+                    }
+                    if ($sc->assignment_exam) {
+                        $allExamsList = $allExamsList->concat($sc->assignment_exam->map(fn($e) => optional($e->assignment_exam_name)->id));
+                    }
+                }
+            }
+        }
+    }
+
+    $assessmentIds = $allAssessmentsList->pluck('id')->filter()->unique();
+    $courseIds = $allCourseIds->filter()->unique();
+
+    // Fetch all user assessment results and all course documents (type 6) for fallback matching
+    $allUserAssessmentResults = \App\Models\Assessment_results::where('user_id', $user->id)
+        ->whereNull('deleted_at')
+        ->orderBy('id', 'desc')
+        ->get();
+
+    $allCourseDocsRaw = Course_documents::whereIn('course_id', $courseIds)
+        ->where('type', 6)
+        ->where('is_delete', 0)
         ->get()
+        ->groupBy('course_id');
+
+    $allResults = $allUserAssessmentResults->whereIn('course_document_id', $assessmentIds)
         ->groupBy('course_document_id');
 
     // Pre-fetch ALL exam attempts, sorting by latest attempt so the 3rd/final try overrides previous fails
-    $courseIds = $assessments->pluck('course_details.id')->filter()->unique();
-    $examIds = $assessments->flatMap(fn($a) => optional($a->course_details)->assignment_exam ? $a->course_details->assignment_exam->map(fn($e) => optional($e->assignment_exam_name)->id) : [])->filter()->unique();
+    $examIds = $allExamsList->filter()->unique();
     $assignedUserIds = $assessments->pluck('id')->filter()->unique();
 
     $rawExamAttempts = \App\Models\ExamAttempt::whereIn('exam_id', $examIds)
-        ->where(function($q) use ($user, $assignedUserIds, $courseIds) {
+        ->where('user_id', $user->id)
+        ->where(function($q) use ($assignedUserIds, $courseIds) {
             $q->whereIn('assigned_id', $assignedUserIds)
-              ->orWhere('user_id', $user->id)
-              ->orWhereIn('course_id', $courseIds);
+              ->orWhere(function($sub) use ($courseIds) {
+                  $sub->whereNull('assigned_id')->whereIn('course_id', $courseIds);
+              });
         })
         ->orderBy('id', 'desc') // Ensures latest attempt is prioritized
         ->get();
@@ -1574,9 +1834,13 @@ public function fetch_myteam_userdetails(Request $request)
         'assignedUser',
         'assessments',
         'allResults',
+        'allUserAssessmentResults',
+        'allCourseDocsRaw',
         'allExamAttempts',
         'allAnswerMarks',
-        'allQuestionMarks'
+        'allQuestionMarks',
+        'userAssignedSubcourses',
+        'parentCourseIdsInAssessments'
     ))->render();
 
     return $html;
@@ -1642,7 +1906,7 @@ public function fetch_myteam_userdetails(Request $request)
 
         $category_list=Category::get();
         $category_view = Category::with(['category_assigned_cousers'=>function($q){
-            $q->where('user_id',Auth::user()->id);
+            $q->where('user_id',Auth::user()->id)->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
         }])->whereHas('category_assigned_cousers', function ($query) {
                        $query->where('user_id', Auth::user()->id);
                        $query->where('status',3);
@@ -1699,9 +1963,15 @@ public function fetch_myteam_userdetails(Request $request)
         }
 
         return DB::transaction(function () use ($request, $user, $list, $assessment) {
+            $matchingCourseIds = [$assessment->course_id];
+            $courseDocCourse = Courses::find($assessment->course_id);
+            if ($courseDocCourse && $courseDocCourse->parent_id) {
+                $matchingCourseIds[] = $courseDocCourse->parent_id;
+            }
+
             $assigned = Asigneduser::where('id', $request->assign_id)
                 ->where('user_id', $user->id)
-                ->where('course_id', $assessment->course_id)
+                ->whereIn('course_id', $matchingCourseIds)
                 ->lockForUpdate()
                 ->first();
 
@@ -1715,7 +1985,7 @@ public function fetch_myteam_userdetails(Request $request)
                 return response()->json(['error' => 'Course assignment not found'], 404);
             }
 
-            $requiredVideoIds = $this->requiredAssessmentVideoIds($assigned->course_id);
+            $requiredVideoIds = $this->requiredAssessmentVideoIds($assessment->course_id);
             if (!$this->hasCompletedAllRequiredVideos($assigned->id, $user->id, $requiredVideoIds)) {
                     return response()->json([
                         'error' => 'Watch every course video completely before taking an assessment.',
@@ -2267,15 +2537,49 @@ public function update_notification_count(Request $request)
 }
 public function get_results(Request $request)
 {
+    $list = Assessment_results::where('course_document_id', $request->id)
+        ->where('assign_id', $request->assign_id)
+        ->whereNull('deleted_at')
+        ->orderBy('id', 'asc')
+        ->get();
 
-    // dd('hi');
-    $list = Assessment_results::where('course_document_id',$request->id)->where('assign_id',$request->assign_id)->get();
-    $i=1;$html="";
-    foreach ($list as $key => $value) {
-                $result=json_decode($value->results);
+    if ($list->isEmpty()) {
+        $doc = Course_documents::find($request->id);
+        if ($doc) {
+            $matchedDocIds = Course_documents::where('course_id', $doc->course_id)
+                ->where('type', 6)
+                ->where('is_delete', 0)
+                ->get()
+                ->filter(function($d) use ($doc) {
+                    return $d->id == $doc->id || trim(strtolower($d->file_name)) === trim(strtolower($doc->file_name));
+                })
+                ->pluck('id')
+                ->toArray();
 
-       $html.="<tr><td>".$i++."</td><td>".date('Y-m-d',strtotime($value->completed_at))."</td><td>".$result->percentage."%</td><td>".$result->pass_or_fail."</td></tr>";
+            $list = Assessment_results::whereIn('course_document_id', $matchedDocIds)
+                ->where(function($q) use ($request) {
+                    $q->where('assign_id', $request->assign_id)
+                      ->orWhereNull('assign_id')
+                      ->orWhere('assign_id', 0);
+                })
+                ->where('user_id', Auth::id())
+                ->whereNull('deleted_at')
+                ->orderBy('id', 'asc')
+                ->get();
+        }
+    }
 
+    $latestList = $list->count() > 3 ? $list->slice(-3)->values() : $list;
+    $i = 1;
+    $html = "";
+    foreach ($latestList as $value) {
+        $payload = json_decode($value->result_data ?? '', true);
+        $details = $payload['results'] ?? json_decode($value->results ?? '', true);
+        $percentage = isset($details['percentage']) && is_numeric($details['percentage']) ? round((float)$details['percentage'], 1) . '%' : '-';
+        $passOrFail = $details['pass_or_fail'] ?? (method_exists($value, 'hasPassed') && $value->hasPassed() ? 'Passed' : 'Failed');
+        $dateStr = $value->completed_at ? date('Y-m-d', strtotime($value->completed_at)) : ($value->created_at ? date('Y-m-d', strtotime($value->created_at)) : '-');
+
+        $html .= "<tr><td>" . $i++ . "</td><td>" . $dateStr . "</td><td>" . $percentage . "</td><td>" . ucfirst(strtolower(trim((string)$passOrFail))) . "</td></tr>";
     }
     return $html;
 }
@@ -2358,15 +2662,17 @@ public function myinstructorled_courses(Request $request)
         $category_list=Category::whereHas('category_assigned_cousers')->get();
 
         $category_view = Category::with(['category_assigned_cousers'=>function($q){
-            $q->where('user_id',Auth::user()->id);
+            $q->where('user_id',Auth::user()->id)->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
         }])->whereHas('category_assigned_cousers', function ($query) {
                        $query->where('user_id', Auth::user()->id);
                             $query->where('status','!=',3);
+                            $query->whereHas('course_details', fn($cd) => $cd->whereNull('parent_id'));
                      })->where(function($q) use($request){
             if(!empty($request->category_id)){
                 $q->where('id',$request->category_id);
             }
         })->whereHas('category_assigned_cousers.course_details', function ($q) use($request) {
+            $q->whereNull('parent_id');
 
              if(!empty($request->due_by)){
                 $date=date('Y-m-d');

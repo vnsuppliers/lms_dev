@@ -420,7 +420,22 @@
                                                                 Online Training
                                                             @endif</div>
 
-                                                            <div class="py-1 sub-text">{{ $courses_list->assigned_usersdetails_count ?? ($courses_list->Assigned_usersdetails ? $courses_list->Assigned_usersdetails->count() : 0) }} users enrolled</div>
+                                                            <div class="py-1">
+                                                                <span class="sub-text d-block">{{ $courses_list->assigned_usersdetails_count ?? ($courses_list->Assigned_usersdetails ? $courses_list->Assigned_usersdetails->count() : 0) }} users enrolled</span>
+                                                                @php
+                                                                    $subCoursesCount = (int)($courses_list->sub_courses_count ?? ($courses_list->sub_courses ? $courses_list->sub_courses->count() : 0));
+                                                                @endphp
+                                                                <a href="javascript:;" 
+                                                                   class="sub_course_check sub-text d-inline-flex align-items-center mt-1" 
+                                                                   data-id="{{ $courses_list->id }}" 
+                                                                   data-dep="{{ $courses_list->category_details->department_id ?? '' }}" 
+                                                                   style="color: #005452 !important; font-weight: 600 !important; font-size: 13px !important; text-decoration: none; cursor: pointer;"
+                                                                   onmouseover="this.style.textDecoration='underline'" 
+                                                                   onmouseout="this.style.textDecoration='none'"
+                                                                   title="Open Sub Courses">
+                                                                    <i class="fa-solid fa-layer-group me-1" style="font-size: 11px; color: #005452;"></i>{{ $subCoursesCount }} {{ $subCoursesCount == 1 ? 'sub course' : 'sub courses' }}
+                                                                </a>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -667,8 +682,60 @@ $('body').on('click', '.search_course_to_user_button', function() {
         });
     });
 
+    $('body').on('click', '.sub_course_check', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var $row = $(this).parents('td');
+        $row.addClass('course-active');
+        $('#courses_list_div').find('td').not($row).removeClass('course-active');
+
+        var dep = $(this).data('dep');
+        var course_id = $(this).data('id');
+        if (!course_id) return;
+
+        $('.please_select_document').hide();
+        $('#loader').css('display', 'flex').show();
+
+        $.ajax({
+            url: "{{url('fetch_course_details')}}?course_id=" + course_id + "&active_tab=sub-courses",
+            type: 'GET',
+            dataType: 'html',
+            success: function(response) {
+                $('.ajax_html_div').html(response);
+                $('#loader').hide();
+
+                // Ensure Sub Courses tab is activated
+                $('#course_ajax_pop > nav #nav-tab > button').removeClass('active');
+                var $subTabBtn = $('#sub-courses-tab, #course_ajax_pop > nav #nav-tab > button[data-bs-target="#sub-courses"]');
+                if ($subTabBtn.length) {
+                    $subTabBtn.addClass('active');
+                    $('#course_ajax_pop > .tab-content > .tab-pane').removeClass('show active');
+                    $('#sub-courses').addClass('show active');
+
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                        try {
+                            var bsTab = bootstrap.Tab.getOrCreateInstance ? bootstrap.Tab.getOrCreateInstance($subTabBtn[0]) : new bootstrap.Tab($subTabBtn[0]);
+                            bsTab.show();
+                        } catch(err) {}
+                    }
+                }
+
+                if (dep != "") {
+                    $('.reset_filter_button').show();
+                    $('#filtersButton').addClass('filters-active');
+                    $('#filtersIndicator').css('display', 'inline-block');
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#loader').hide();
+                console.error("Error fetching course details: ", error);
+            }
+        });
+    });
+
     $('body').on('click', '#courses_list_div tr', function(e) {
-        if ($(e.target).closest('.user_check').length) {
+        if ($(e.target).closest('.user_check, .sub_course_check').length) {
             return;
         }
         var $userCheck = $(this).find('.user_check');
@@ -953,6 +1020,103 @@ $('body').on('click', '.search_course_to_user_button', function() {
             $('.modal-backdrop').remove();
             $('body').removeClass('modal-open');
             $('body').css('padding-right', '');
+            $(this).removeData('parent-id');
+        });
+
+        // Sub-course delete form submission via AJAX (keeps admin on the Sub Courses tab)
+        $(document).off('submit', '#delete_course_form').on('submit', '#delete_course_form', function(e) {
+            var parentId = $('#deleteCourseModal').data('parent-id');
+            var courseId = $('#courseId').val();
+
+            if (parentId) {
+                e.preventDefault();
+                var $submitBtn = $('#delete_course_submit_btn');
+                $submitBtn.prop('disabled', true).text('Deleting...');
+
+                $.ajax({
+                    url: "{{ url('delete_course') }}",
+                    type: 'POST',
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        id: courseId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        $submitBtn.prop('disabled', false).text('Delete');
+                        $('#deleteCourseModal').modal('hide');
+                        $('.modal-backdrop').remove();
+                        $('body').removeClass('modal-open');
+                        $('body').css('padding-right', '');
+                        $('#deleteCourseModal').removeData('parent-id');
+
+                        // Update sub-course count on left list without needing full page refresh
+                        if (typeof response.sub_courses_count !== 'undefined') {
+                            var count = parseInt(response.sub_courses_count, 10);
+                            var label = count === 1 ? '1 sub course' : count + ' sub courses';
+                            var $listSubBtn = $('.sub_course_check[data-id="' + parentId + '"]');
+                            if ($listSubBtn.length) {
+                                $listSubBtn.html('<i class="fa-solid fa-layer-group me-1" style="font-size: 11px; color: #005452;"></i>' + label);
+                            }
+                        }
+
+                        // Reload parent course details and re-open Sub Courses tab
+                        $('#loader').css('display', 'flex').show();
+                        $.ajax({
+                            url: "{{ url('fetch_course_details') }}?course_id=" + parentId,
+                            type: 'GET',
+                            dataType: 'html',
+                            success: function(htmlResponse) {
+                                $('.ajax_html_div').html(htmlResponse);
+                                $('#loader').hide();
+
+                                // Activate the Sub Courses tab
+                                $('#course_ajax_pop > nav #nav-tab > button').removeClass('active');
+                                var $subTabBtn = $('#sub-courses-tab, #course_ajax_pop > nav #nav-tab > button[data-bs-target="#sub-courses"]');
+                                if ($subTabBtn.length) {
+                                    $subTabBtn.addClass('active');
+                                    $('#course_ajax_pop > .tab-content > .tab-pane').removeClass('show active');
+                                    $('#sub-courses').addClass('show active');
+
+                                    if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                                        try {
+                                            var bsTab = bootstrap.Tab.getOrCreateInstance ? bootstrap.Tab.getOrCreateInstance($subTabBtn[0]) : new bootstrap.Tab($subTabBtn[0]);
+                                            bsTab.show();
+                                        } catch(err) {}
+                                    }
+                                }
+
+                                if (typeof $.toast === 'function') {
+                                    $.toast({
+                                        heading: 'Success',
+                                        text: 'Sub course deleted successfully.',
+                                        position: 'bottom-right',
+                                        stack: false,
+                                        icon: 'success'
+                                    });
+                                }
+                            },
+                            error: function() {
+                                $('#loader').hide();
+                            }
+                        });
+                    },
+                    error: function(xhr) {
+                        $submitBtn.prop('disabled', false).text('Delete');
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Failed to delete sub course.';
+                        if (typeof $.toast === 'function') {
+                            $.toast({
+                                heading: 'Warning',
+                                text: msg,
+                                position: 'bottom-right',
+                                stack: false,
+                                icon: 'warning'
+                            });
+                        } else {
+                            alert(msg);
+                        }
+                    }
+                });
+            }
         });
 
         // Auto-select course and activate reports sub-tab when returning from Assessment

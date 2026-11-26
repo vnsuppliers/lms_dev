@@ -59,26 +59,12 @@
         width: 100%;
         height: 100%;
         min-height: 400px;
-        background: rgba(255, 255, 255, .85);
+        background: rgba(255, 255, 255, 0.85);
         z-index: 1050;
         display: none;
         justify-content: center;
         align-items: center;
-    }
-
-    #pageLoader .spinner {
-        width: 60px;
-        height: 60px;
-        border: 5px solid #ddd;
-        border-top: 5px solid #0d6efd;
-        border-radius: 50%;
-        animation: spin .8s linear infinite;
-    }
-
-    @keyframes spin {
-        100% {
-            transform: rotate(360deg);
-        }
+        flex-direction: column;
     }
 
 </style>
@@ -122,8 +108,8 @@
                                                     </thead>
                                                     <tbody id="myteam_list_div">
                                                         @foreach ($allUsers as $user)
-                                                        <tr class="user_check" data-id="6" style="cursor: pointer;">
-                                                            <td class="myteam_each_details" style="cursor:pointer;"  data-id="{{$user->id}}" onclick="openData()">
+                                                        <tr class="user_check" data-id="{{$user->id}}" style="cursor: pointer;">
+                                                            <td class="myteam_each_details" style="cursor:pointer;" data-id="{{$user->id}}" onclick="openData()">
                                                                 <div class="d-flex align-items-center">
                                                                     <div class="profile-image-div-sm">
                                                                     @if(!empty($user->profile_image))
@@ -142,7 +128,7 @@
                                                             </td>
                                                             <!-- <td><div class="py-1 text-start">{{ implode(', ', $user->role_names) }}
                                                             </div></td> -->
-                                                            <td style="width:100px;">
+                                                            <td class="myteam_each_details" style="width:100px; cursor:pointer;" data-id="{{$user->id}}" onclick="openData()">
                                                                 <div class="py-1 text-center">@if(isset($user->assigned_user)){{ $user->assigned_user->count() ??'0' }} @endif</div>
                                                             </td>
                                                         </tr>  
@@ -161,8 +147,9 @@
 
                         <div class="sidepop pr-0 pr-md-0 pt-1" id="dataOverlay">
                             {{-- In-drawer Centered Loader --}}
-                            <div id="pageLoader">
-                                <div class="spinner"></div>
+                            <div id="pageLoader" style="display:none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; min-height: 400px; background: rgba(255, 255, 255, 0.85); z-index: 1050;" class="align-items-center justify-content-center flex-column">
+                                <img src="{{ url('public/images/loading.gif') }}" class="img-fluid opacity-50" style="max-height: 80px;" alt="Loading...">
+                                <div class="mt-2 text-muted fw-semibold font-smallsize">Loading user details...</div>
                             </div>
                             <div class="col-12 myteam_ajax_html_div p-0">
                             
@@ -195,7 +182,8 @@
       // document.getElementById("main").style.marginRight = "40%";
       document.getElementById("dataOverlay").style.right = "0px";
       $('.main_subdiv').removeClass('col-lg-10 offset-lg-1');
-      $('.card-list-div').removeClass('col-lg-3')
+      $('.card-list-div').removeClass('col-lg-3');
+      $('#pageLoader').css('display', 'flex').show();
     }
 
     function closeData() {
@@ -207,6 +195,7 @@
       $('.main_subdiv').addClass('col-lg-10 offset-lg-1');
       $('.card-list-div').addClass('col-lg-3');
       $('#pageLoader').hide();
+      $('.myteam_ajax_html_div').empty();
       $('#myteam_list_div tr').removeClass('course-active');
       sessionStorage.removeItem('lms_myteam_user_id');
       sessionStorage.removeItem('lms_myteam_open_tab');
@@ -232,12 +221,18 @@ $(document).ready(function () {
         }
     });
 
-    $('.myteam_each_details').on('click', function () {
+    $(document).on('click', '.myteam_each_details', function () {
+        if (typeof openData === 'function') {
+            openData();
+        }
 
         $(this).parents('#myteam_list_div').find('tr').removeClass('course-active');
         $(this).parents('tr').addClass('course-active');
 
         var user_id = $(this).data('id');
+        if (!user_id) {
+            user_id = $(this).closest('tr').data('id');
+        }
         sessionStorage.setItem('lms_myteam_user_id', user_id);
 
         $.ajax({

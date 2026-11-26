@@ -14,6 +14,8 @@ class Courses extends Model
      protected $table = 'tbl_courses';
     
     protected $fillable = [
+        'parent_id',
+        'order_no',
         'course_name',
         'category_id',
         'subcategory_id',
@@ -35,6 +37,19 @@ class Courses extends Model
     ];
 
     protected $dates = ['deleted_at'];
+    
+    public function sub_courses()
+    {
+        return $this->hasMany(self::class, 'parent_id', 'id')
+            ->where('is_delete', 0)
+            ->orderBy('order_no', 'asc')
+            ->orderBy('id', 'asc');
+    }
+
+    public function parent_course()
+    {
+        return $this->belongsTo(self::class, 'parent_id', 'id');
+    }
     
     public function Assign_userdetails()
     {

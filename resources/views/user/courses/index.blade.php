@@ -154,6 +154,63 @@
         align-items: center;
         flex-direction: column;
     }
+    .course-name-link {
+        text-decoration: none !important;
+    }
+    .course-name {
+        color: #364a63;
+        transition: color 0.15s ease-in-out;
+    }
+    .course-name-link:hover .course-name:not(.course-name-expired),
+    a.assigned_courses:hover .course-name:not(.course-name-expired),
+    .course-name:hover:not(.course-name-expired),
+    .course-name.active-course-underline:not(.course-name-expired) {
+        text-decoration: none !important;
+        color: #005452 !important;
+    }
+    .course-name,
+    .course-name.active-course-underline {
+        text-decoration: none !important;
+    }
+    .course-name-expired,
+    .course-name-expired:hover,
+    .course-name.course-name-expired,
+    .course-name.course-name-expired:hover,
+    .course-name.course-name-expired.active-course-underline,
+    .course-expired,
+    .course-expired:hover,
+    .course-expired .course-name,
+    .course-expired:hover .course-name {
+        text-decoration: none !important;
+        color: #364a63 !important;
+        cursor: default !important;
+    }
+    a.tab_menus,
+    a.tab_menus:hover,
+    a.tab_menus:focus,
+    .btn-active-primaryy-tab,
+    .btn-primaryy-tab {
+        text-decoration: none !important;
+    }
+    a[href*="menu=expired"].btn-active-primaryy-tab {
+        border-bottom: none !important;
+        text-decoration: none !important;
+    }
+    .sub-courses-container {
+        border-top: 1px dashed #dbe5ea;
+    }
+    .sub-course-row {
+        background: transparent !important;
+        border: none !important;
+        border-left: 3px solid #005452 !important;
+        transition: background-color 0.2s ease;
+    }
+    .sub-course-row:hover {
+        background-color: #f7faf9 !important;
+    }
+    .sub-course-row.sub-course-active {
+        background-color: #eef6f5 !important;
+    }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -171,14 +228,35 @@
                                         <div class="horizontal-tabs-div">
                                             <div class="d-flex flex-wrap horizontal-tabs justify-content-between align-items-center gap-2">
                                                 <div class="d-flex flex-wrap align-items-center">
+                                                    @php
+                                                        $todayDate = \Carbon\Carbon::today();
+                                                        $notStartedCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) !== 0 && (int)($item->status ?? 0) !== 2) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return empty($exp) || $exp == '1970-01-01 00:00:00' || $exp == '1970-01-01' || \Carbon\Carbon::parse($exp)->gte($todayDate);
+                                                        })->count();
+
+                                                        $inProgressCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) !== 1) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return empty($exp) || $exp == '1970-01-01 00:00:00' || $exp == '1970-01-01' || \Carbon\Carbon::parse($exp)->gte($todayDate);
+                                                        })->count();
+
+                                                        $completedCount = $countlist->where('status', '==', 3)->count();
+
+                                                        $expiredCount = $countlist->filter(function($item) use ($todayDate) {
+                                                            if ((int)($item->status ?? 0) === 3) return false;
+                                                            $exp = $item->course_details->expiration_date ?? null;
+                                                            return !empty($exp) && $exp != '1970-01-01 00:00:00' && $exp != '1970-01-01' && \Carbon\Carbon::parse($exp)->lt($todayDate);
+                                                        })->count();
+                                                    @endphp
                                                     <a href="{{url('user_courses')}}?menu=my_course&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='my_course' || Request::get('menu')=='' ) btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">My All Courses <span> - {{count($countlist)??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=Offline&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&status=1&assign_status=0&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='Offline') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Not started <span> - {{count($countlist->where('status','==',0))??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=progress&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='progress') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">In-progress<span> - {{count($countlist->where('status','==',1))??''}}</span></a>
-                                                    <a href="{{url('user_courses')}}?menu=bookmark&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&assign_status=3&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='bookmark') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus @if(!in_array(Request::get('menu'), ['due_soon', 'expired', 'bookmarked']) && Request::get('bookmark') != 1) me-0 @endif">Completed<span> - {{count($countlist->where('status','==',3))??''}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=Offline&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&status=1&assign_status=0&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='Offline') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Not started <span> - {{$notStartedCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=progress&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='progress') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">In-progress<span> - {{$inProgressCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=bookmark&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&assign_status=3&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='bookmark') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus">Completed<span> - {{$completedCount}}</span></a>
+                                                    <a href="{{url('user_courses')}}?menu=expired&tab_id={{$request->tab_id}}&category_id={{$request->category_id}}&due_by={{$request->due_by}}&search={{$request->search}}" class="btn btn-sm @if(Request::get('menu')=='expired') btn-active-primaryy-tab @else btn-primaryy-tab @endif tab_menus @if(!in_array(Request::get('menu'), ['due_soon', 'bookmarked']) && Request::get('bookmark') != 1) me-0 @endif">Expired<span> - {{$expiredCount}}</span></a>
                                                     @if(Request::get('menu') == 'due_soon')
                                                         <a href="{{url('user_courses')}}?menu=due_soon" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0">Courses Due Soon <span> - {{count($list)}}</span></a>
-                                                    @elseif(Request::get('menu') == 'expired')
-                                                        <a href="{{url('user_courses')}}?menu=expired" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0">Courses Expired <span> - {{count($list)}}</span></a>
                                                     @elseif(Request::get('menu') == 'bookmarked' || Request::get('bookmark') == 1)
                                                         <a href="{{url('user_courses')}}?menu=bookmarked" class="btn btn-sm btn-active-primaryy-tab tab_menus me-0">Bookmarked Courses <span> - {{count($list)}}</span></a>
                                                     @endif
@@ -387,24 +465,40 @@
                                                             <div class="col-11 col-lg-11">
                                                                 <div class="d-flex align-items-center">
                                                                     <div class="">
-                                                                        <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
-                                                                            <div class="courses-image-div">
+                                                                        @php
+                                                                            $isCourseExpired = (Request::get('menu') == 'expired') || (!empty($data->course_details->expiration_date) 
+                                                                                && $data->course_details->expiration_date != '1970-01-01 00:00:00' 
+                                                                                && $data->course_details->expiration_date != '1970-01-01' 
+                                                                                && \Carbon\Carbon::parse($data->course_details->expiration_date)->isPast());
+                                                                        @endphp
+                                                                        @if($isCourseExpired)
+                                                                            <div class="courses-image-div" style="cursor: default;">
                                                                                 @if($data->course_details->course_image)
                                                                                     <img src="{{ url('storage/app/public/' . $data->course_details->course_image) }}" class="img-fluid user-courses-listing-view-image" alt="">
                                                                                 @else
                                                                                     <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid user-courses-listing-view-image user-course-image-empty" alt="">
                                                                                 @endif
                                                                             </div>
-                                                                        </a>
+                                                                        @else
+                                                                            <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
+                                                                                <div class="courses-image-div">
+                                                                                    @if($data->course_details->course_image)
+                                                                                        <img src="{{ url('storage/app/public/' . $data->course_details->course_image) }}" class="img-fluid user-courses-listing-view-image" alt="">
+                                                                                    @else
+                                                                                        <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid user-courses-listing-view-image user-course-image-empty" alt="">
+                                                                                    @endif
+                                                                                </div>
+                                                                            </a>
+                                                                        @endif
                                                                     </div>
                                                                     <div class="pl-0 ml-2 pl-lg-3 ml-lg-0">
                                                                         <div>
-                                                                            @if($data->course_details->expiration_date < now())
-                                                                                <div class="text-start course-name font-weight-bold mb-0" >
+                                                                            @if($isCourseExpired)
+                                                                                <div class="text-start course-name course-name-expired font-weight-bold mb-0" style="text-decoration: none !important; cursor: default;">
                                                                                 {{$data->course_details->course_name??''}}
                                                                                 </div>
                                                                             @else
-                                                                                <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
+                                                                                <a href="javascript:;" class="assigned_courses course-name-link" data-assign_id="{{$data->id}}">
                                                                                     <div class="text-start course-name font-weight-bold mb-0" style="cursor:pointer" onclick="openData()">
                                                                                     {{$data->course_details->course_name??''}}
                                                                                     </div>
@@ -540,9 +634,9 @@
                                                                     </div>
                                                                     <div class="pt-0">
                                                                        
-                                                                        @if($data->course_details->expiration_date < now())
+                                                                        @if($isCourseExpired)
                                                                         <span class="btn btn-secondary border-radius-top me-1"
-                                                                            style="cursor: default; pointer-events: none;">
+                                                                            style="cursor: default; pointer-events: none; text-decoration: none !important;">
                                                                             Expired
                                                                         </span>
                                                                         @else
@@ -558,6 +652,121 @@
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                        @if($data->course_details->sub_courses && $data->course_details->sub_courses->count() > 0)
+                                                        <div class="col-12 px-0 px-lg-2">
+                                                            <hr class="my-2" style="border-top: 1px dashed #d5dee5;" />
+                                                            <div class="sub-courses-container">
+                                                                <div class="text-muted fs-7 mb-2 px-1 fw-semibold d-flex align-items-center">
+                                                                    <i class="fa-solid fa-code-branch me-2" style="color:#005452;"></i>
+                                                                    <span>Sub Courses ({{ $data->course_details->sub_courses->count() }})</span>
+                                                                </div>
+                                                                @foreach($data->course_details->sub_courses as $subCourse)
+                                                                @php
+                                                                    $subExpDate = (!empty($subCourse->expiration_date) && $subCourse->expiration_date != '1970-01-01 00:00:00' && $subCourse->expiration_date != '1970-01-01') ? $subCourse->expiration_date : $data->course_details->expiration_date;
+                                                                    $isSubExpired = $isCourseExpired || (!empty($subExpDate) && $subExpDate != '1970-01-01 00:00:00' && $subExpDate != '1970-01-01' && \Carbon\Carbon::parse($subExpDate)->isPast());
+                                                                @endphp
+                                                                <div class="sub-course-row py-2 ps-3 pe-2 mb-1 rounded @if($isSubExpired) course-expired @endif" style="border-left: 3px solid #005452; background: transparent;">
+                                                                    <div class="row align-items-center">
+                                                                        <div class="col-12 col-md-8">
+                                                                            <div class="d-flex align-items-center">
+                                                                                <div class="courses-image-div flex-shrink-0 me-2" style="width: 48px; height: 36px; @if($isSubExpired) cursor: default; @endif">
+                                                                                    @if($isSubExpired)
+                                                                                        @if($subCourse->course_image)
+                                                                                            <img src="{{ url('storage/app/public/' . $subCourse->course_image) }}" class="img-fluid rounded" style="width:48px; height:36px; object-fit:cover;" alt="">
+                                                                                        @else
+                                                                                            <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid rounded" style="width:48px; height:36px; object-fit:cover;" alt="">
+                                                                                        @endif
+                                                                                    @else
+                                                                                        <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}" data-course_id="{{$subCourse->id}}">
+                                                                                            @if($subCourse->course_image)
+                                                                                                <img src="{{ url('storage/app/public/' . $subCourse->course_image) }}" class="img-fluid rounded" style="width:48px; height:36px; object-fit:cover;" alt="">
+                                                                                            @else
+                                                                                                <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid rounded" style="width:48px; height:36px; object-fit:cover;" alt="">
+                                                                                            @endif
+                                                                                        </a>
+                                                                                    @endif
+                                                                                </div>
+                                                                                <div class="pl-1">
+                                                                                    <div class="d-flex align-items-center flex-wrap gap-1">
+                                                                                        <span class="badge" style="background:#005452; color:#fff; font-size:10px; font-weight:600; padding:2px 6px; border-radius:3px;">Sub Course</span>
+                                                                                        @if($isSubExpired)
+                                                                                            <span class="course-name course-name-expired font-weight-bold fs-7" style="text-decoration: none !important; cursor: default;">
+                                                                                                {{$subCourse->course_name}}
+                                                                                            </span>
+                                                                                        @else
+                                                                                            <a href="javascript:;" class="assigned_courses course-name-link" data-assign_id="{{$data->id}}" data-course_id="{{$subCourse->id}}">
+                                                                                                <span class="course-name font-weight-bold fs-7" style="cursor:pointer" onclick="openData()">
+                                                                                                    {{$subCourse->course_name}}
+                                                                                                </span>
+                                                                                            </a>
+                                                                                        @endif
+                                                                                    </div>
+                                                                                    <div class="d-flex flex-wrap align-items-center text-muted fs-7 pt-1">
+                                                                                        <span class="d-flex align-items-center pe-3 text-muted">
+                                                                                            <i class="fa-solid fa-circle id-circle-icon"></i>
+                                                                                            <label class="ps-1 mb-0 text-muted">Assigned : </label>
+                                                                                            <span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($data->created_at))->format('F j, Y g:i a T') }}">{{ \Carbon\Carbon::createFromTimeStamp(strtotime($data->created_at))->diffForHumans() }}</span>
+                                                                                        </span>
+                                                                                        <span class="d-flex align-items-center pe-3 text-muted">
+                                                                                            <i class="fa-solid fa-circle id-circle-icon"></i>
+                                                                                            <span>
+                                                                                                @if($subCourse->course_type==1 || $data->course_details->course_type==1)
+                                                                                                <label class="ps-1 mb-0 text-muted">Due : </label>
+                                                                                                <span class="ps-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ \Carbon\Carbon::createFromTimeStamp(strtotime($subExpDate))->format('F j, Y g:i a T') }}">{{ \Carbon\Carbon::createFromTimeStamp(strtotime($subExpDate))->diffForHumans() }}</span>
+                                                                                                @else
+                                                                                                <label class="ps-1 mb-0 text-muted">Training Date : </label>
+                                                                                                <span> {{$subCourse->training_date ?: $data->course_details->training_date}}</span>
+                                                                                                @endif
+                                                                                            </span>
+                                                                                        </span>
+                                                                                        @if($subCourse->assessments && $subCourse->assessments->count() > 0)
+                                                                                        <span class="d-none d-sm-flex align-items-center text-muted">
+                                                                                            <i class="fa-solid fa-circle id-circle-icon"></i>
+                                                                                            <span class="ps-1">Has Assessment</span>
+                                                                                        </span>
+                                                                                        @endif
+                                                                                        <span class="d-flex align-items-center text-muted">
+                                                                                            <span class="dashed-border-category-icon"><i class="fa-solid fa-folder-tree"></i></span>
+                                                                                            <span class="ps-1">{{$subCourse->category_details->category_name ?? ($data->category_details->category_name ?? '')}}</span>
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="col-12 col-md-4 mt-2 mt-md-0">
+                                                                            <div class="d-flex align-items-center justify-content-md-end justify-content-between">
+                                                                                <div class="me-2">
+                                                                                    @if ($data->status == 0)
+                                                                                    <div class="status-textt-in-coursess fs-7"><i class="fa-solid fa-circle text-light-red fs10 pe-1"></i>Not Started</div>
+                                                                                    @elseif ($data->status == 3)
+                                                                                    <div class="status-textt-in-coursess fs-7"><i class="fa-solid fa-circle text-light-green fs10 pe-1"></i>Completed</div>
+                                                                                    @elseif($data->status == 1)
+                                                                                    <div class="status-textt-in-coursess fs-7"><i class="fa-solid fa-circle text-light-yellow fs10 pe-1"></i>In Progress</div>
+                                                                                    @endif
+                                                                                </div>
+                                                                                <div>
+                                                                                    @if($isSubExpired)
+                                                                                    <span class="btn btn-secondary border-radius-top me-1"
+                                                                                        style="cursor: default; pointer-events: none; font-size:12px; padding:4px 10px; text-decoration: none !important;">
+                                                                                        Expired
+                                                                                    </span>
+                                                                                    @else
+                                                                                    @if($data->course_details->course_type==1)
+                                                                                     <a href="{{url('start_course')}}?id={{$data->id}}&course_id={{$subCourse->id}}" class="btn web-btn bottom-butun-in-card border-radius-top me-1" style="font-size:12px; padding:4px 10px;"> Start from Beginning </a>
+                                                                                    @if(!empty($data->scorm_details))
+                                                                                    <a href="{{url('start_course')}}?id={{$data->id}}&course_id={{$subCourse->id}}" class="btn web-btn bottom-butun-in-card bottom-butun-in-card1 border-radius-top me-1" style="font-size:12px; padding:4px 10px;">Resume</a>
+                                                                                    @endif
+                                                                                    @endif
+                                                                                    @endif
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                        @endif
                                                     </div>
                                                     @endforeach
                                                 </div>
@@ -575,7 +784,13 @@
                                                     @endif
                                                 </div>
                                                 @foreach($list as $data)
-                                                <div class="col-12 col-sm-6 col-md-4 col-lg-3 card-list-div my-2 px-3 px-md-2 assigned_courses courses_list" data-assign_id="{{$data->id}}">
+                                                @php
+                                                    $isCardExpired = (Request::get('menu') == 'expired') || (!empty($data->course_details->expiration_date) 
+                                                        && $data->course_details->expiration_date != '1970-01-01 00:00:00' 
+                                                        && $data->course_details->expiration_date != '1970-01-01' 
+                                                        && \Carbon\Carbon::parse($data->course_details->expiration_date)->isPast());
+                                                @endphp
+                                                <div class="col-12 col-sm-6 col-md-4 col-lg-3 card-list-div my-2 px-3 px-md-2 @if(!$isCardExpired) assigned_courses @else course-expired @endif courses_list" data-assign_id="{{$data->id}}">
                                                     <div class="bg-light border">
                                                         <div class="card-view-fav-icon">
                                                              @if(!empty($data->bookmark_data))
@@ -586,26 +801,39 @@
                                                             <i class="fa-regular fa-star"></i></a>
                                                             @endif
                                                         </div>
-                                                        <div class="courses-image-div">
-                                                            <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
-                                                            @if($data->course_details->course_image)
-                                                                <img src="{{ url('storage/app/public/' . $data->course_details->course_image) }}" class="img-fluid card-list-course-img" alt="">
+                                                        <div class="courses-image-div" @if($isCardExpired) style="cursor: default;" @endif>
+                                                            @if($isCardExpired)
+                                                                @if($data->course_details->course_image)
+                                                                    <img src="{{ url('storage/app/public/' . $data->course_details->course_image) }}" class="img-fluid card-list-course-img" alt="">
+                                                                @else
+                                                                    <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid card-list-course-img" alt="">
+                                                                @endif
                                                             @else
-                                                                <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid card-list-course-img" alt="">
+                                                                <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
+                                                                    @if($data->course_details->course_image)
+                                                                        <img src="{{ url('storage/app/public/' . $data->course_details->course_image) }}" class="img-fluid card-list-course-img" alt="">
+                                                                    @else
+                                                                        <img src="{{ url('public/images/face12.jpg') }}" class="img-fluid card-list-course-img" alt="">
+                                                                    @endif
+                                                                </a>
                                                             @endif
-                                                        </a>
                                                         </div>
                                                         <!-- <div class="progress progress list-view-p-bar">
                                                             <div class="progress-bar progress-bar-striped bg-pink text-white border-bottom-0" role="progressbar" style="width: 50%;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100">50%</div>
                                                         </div> -->
                                                         <div class="p-2">
                                                             <div class="">
-                                                            <!-- <a href="javascript:;" class="assigned_courses course-name" data-assign_id="{{$data->id}}"> {{$data->course_details->course_name??''}} </a> -->
-                                                            <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
-                                                                <h6 class="text-start course-name mb-0 h-auto" style="cursor:pointer;" onclick="openData()">
+                                                            @if($isCardExpired)
+                                                                <h6 class="text-start course-name course-name-expired mb-0 h-auto" style="text-decoration: none !important; cursor: default;">
                                                                    {{$data->course_details->course_name??''}}
                                                                 </h6>
-                                                            </a>
+                                                            @else
+                                                                <a href="javascript:;" class="assigned_courses" data-assign_id="{{$data->id}}">
+                                                                    <h6 class="text-start course-name mb-0 h-auto" style="cursor:pointer;" onclick="openData()">
+                                                                       {{$data->course_details->course_name??''}}
+                                                                    </h6>
+                                                                </a>
+                                                            @endif
                                                         </div>
 
                                                             <div class="exp-date">
@@ -872,12 +1100,24 @@
             }
         });
     });
-    $('.assigned_courses').click(function(e){
+    $(document).on('click', '.assigned_courses', function(e){
         e.stopPropagation();
-        $('.courses_list').removeClass('course-active');
-        $(this).parents('.courses_list').addClass('course-active');
 
-        var  assign_id = $(this).data('assign_id');
+        if ($(this).hasClass('course-expired') || $(this).closest('.course-expired').length || $(this).find('.course-name-expired').length) {
+            return;
+        }
+
+        $('.course-name').removeClass('active-course-underline');
+        $(this).find('.course-name:not(.course-name-expired)').addBack('.course-name:not(.course-name-expired)').addClass('active-course-underline');
+
+        $('.courses_list').removeClass('course-active');
+        $(this).closest('.courses_list').addClass('course-active');
+
+        $('.sub-course-row').removeClass('sub-course-active');
+        $(this).closest('.sub-course-row').addClass('sub-course-active');
+
+        var assign_id = $(this).data('assign_id');
+        var course_id = $(this).data('course_id');
         var openTab = $(this).data('open-tab');
         if (typeof openData === 'function') {
             openData();
@@ -886,7 +1126,8 @@
             type: "GET",
             url: "{{ url('get_assign_course_data') }}",
             data: {
-                assign_id: assign_id
+                assign_id: assign_id,
+                course_id: course_id
             },
             dataType:"html",
             beforeSend: function() {
@@ -1026,12 +1267,25 @@
   $(document).ready(function () {
         var urlParams = new URLSearchParams(window.location.search);
         var autoAssignId = urlParams.get('assign_id');
+        var autoCourseId = urlParams.get('course_id');
         var autoOpenTab = urlParams.get('open_tab');
         if (autoAssignId) {
-            var targetCourse = $('.assigned_courses[data-assign_id="' + autoAssignId + '"]').first();
-            if (targetCourse.length) {
+            var targetCourse;
+            if (autoCourseId) {
+                targetCourse = $('.assigned_courses[data-assign_id="' + autoAssignId + '"][data-course_id="' + autoCourseId + '"]').first();
+            } else {
+                targetCourse = $('.assigned_courses[data-assign_id="' + autoAssignId + '"]:not([data-course_id])').first();
+                if (!targetCourse.length) {
+                    targetCourse = $('.assigned_courses[data-assign_id="' + autoAssignId + '"]').first();
+                }
+            }
+            if (targetCourse.length && !targetCourse.hasClass('course-expired') && !targetCourse.closest('.course-expired').length && !targetCourse.find('.course-name-expired').length) {
+                $('.course-name').removeClass('active-course-underline');
+                targetCourse.find('.course-name:not(.course-name-expired)').addBack('.course-name:not(.course-name-expired)').addClass('active-course-underline');
                 $('.courses_list').removeClass('course-active');
-                targetCourse.parents('.courses_list').addClass('course-active');
+                targetCourse.closest('.courses_list').addClass('course-active');
+                $('.sub-course-row').removeClass('sub-course-active');
+                targetCourse.closest('.sub-course-row').addClass('sub-course-active');
             }
             if (typeof openData === 'function') {
                 openData();
@@ -1040,7 +1294,8 @@
                 type: "GET",
                 url: "{{ url('get_assign_course_data') }}",
                 data: {
-                    assign_id: autoAssignId
+                    assign_id: autoAssignId,
+                    course_id: autoCourseId
                 },
                 dataType: "html",
                 beforeSend: function() {

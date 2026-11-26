@@ -280,8 +280,30 @@
 
                                             <!-- <input type="hidden" name="id" value="{{ $courses_id->id ?? '' }}" /> -->
                                               <input type="hidden" name="id" value="{{ Request::get('clone_course') ? '' : ($courses_id->id ?? '') }}" />
+                                              <input type="hidden" name="parent_id" value="{{ Request::get('parent_course_id') ?? Request::get('parent_id') ?? ($courses_id->parent_id ?? '') }}" />
 
                                             <input type="hidden" name="save_as_draft" id="save_as_draft" value="0">
+
+                                            @php
+                                                $activeParentCourse = $parent_course ?? (isset($courses_id) && $courses_id->parent_id ? \App\Models\Courses::find($courses_id->parent_id) : (Request::get('parent_course_id') ? \App\Models\Courses::find(Request::get('parent_course_id')) : null));
+                                            @endphp
+                                            @if($activeParentCourse)
+                                            <div class="col-12 mb-3 px-2">
+                                                <div class="alert mb-0 d-flex align-items-center justify-content-between rounded-3 py-2 px-3" style="background:#e6f4f2; border:1px solid #b2dfdb; color:#005452;">
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge me-2" style="background:#005452; color:#fff; font-size:12px; padding:6px 10px;"><i class="fa-solid fa-layer-group me-1"></i> Sub Course</span>
+                                                        <div>
+                                                            <strong style="color:#005452;">{{ isset($courses_id) && $courses_id->id ? 'Editing Sub Course' : 'Create New Sub Course' }}</strong>
+                                                            <span class="mx-2">•</span>
+                                                            <span class="text-dark">Main Course: <strong>{{ $activeParentCourse->course_name }}</strong> (Code: {{ $activeParentCourse->course_code }})</span>
+                                                        </div>
+                                                    </div>
+                                                    <a href="{{ url('coursecatalog?tab=2&menu=1&id='.$activeParentCourse->id) }}" class="btn btn-sm btn-outline-secondary" style="font-size:12px;">
+                                                        <i class="fa-solid fa-arrow-left me-1"></i> Back to Main Course
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            @endif
 
                                             <div class="row">
                                                 <div class="col-12 col-lg-6 pl-2 pl-lg-1">
@@ -419,7 +441,7 @@
                         <li>
                             <i class="fas fa-folder"></i>
                             <input class="cat-radio-btn" type="radio" name="category_id" id="parent_id_{{ $category->id }}" value="{{ $category->id }}"
-                                @if((isset($courses_id) && $courses_id->category_id == $category->id) || request()->input('add_category_id') == $category->id || request()->input('category_id') == $category->id || request()->input('parent_id') == $category->id) checked @endif
+                                @if((isset($courses_id) && $courses_id->category_id == $category->id) || (isset($activeParentCourse) && empty($courses_id) && $activeParentCourse->category_id == $category->id) || request()->input('add_category_id') == $category->id || request()->input('category_id') == $category->id || request()->input('parent_id') == $category->id) checked @endif
                                 @if(request()->input('add_category_id') && request()->input('add_category_id') != $category->id) disabled @endif>
                             <label class="cat-tree-label" for="parent_id_{{ $category->id }}">{{ $category->category_name }}</label>
                             @include('partials.coursesubcategories', ['coursesubcategories' => $category_list, 'parent_id' => $category->id, 'selected_parent_id' => $courses_id->parent_id ?? ''])

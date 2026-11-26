@@ -184,11 +184,10 @@
 					</div>
 				</div>
 				<div class="col-12 col-md-5 col-lg-8">
-					<h4 class="text-white my-auto" style="line-height: 24px;">
-		    			<div class="text-white text-truncate pb-1">{{$courses_data->course_details->course_name}}
-		    			</div>
+					<h4 class="text-white my-auto d-flex align-items-center flex-wrap" style="line-height: 24px;">
+		    			<div class="text-white text-truncate pb-1">{{$displayed_course->course_name}}</div>
 		    		</h4>
-		    		<div class="text-grey-lite"><i class="fa-solid fa-bullseye"></i> {{$courses_data->course_details->goal_details->name??''}}</div>
+		    		<div class="text-grey-lite"><i class="fa-solid fa-bullseye"></i> {{$displayed_course->goal_details->name ?? ($courses_data->course_details->goal_details->name ?? '')}}</div>
 					<!-- <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
 					  <ol class="breadcrumb border-0 mb-0 px-2">
 					    <li class="breadcrumb-item"  style="line-height: 20px;"><a href="{{url('user_courses')}}" class="text-white">{{$courses_data->category_details->category_name}}</a></li>
@@ -216,26 +215,28 @@
 		<div class="col-12 col-md-8 col-lg-9 py-2">
 
 			<div class="videos_division bg-white">
-				
+				@php
+					$currentCourse = $displayed_course ?? $courses_data->course_details;
+				@endphp
 
-				@if(empty($courses_data->course_details->only_scorm->where('is_active',1)->toArray()) && 
-    empty($courses_data->course_details->other_videos->where('is_active',1)->toArray()) && 
-    !empty($courses_data->course_details->only_attachments->where('is_active',1)->toArray()))
+				@if(empty($currentCourse->only_scorm->where('is_active',1)->toArray()) && 
+    empty($currentCourse->other_videos->where('is_active',1)->toArray()) && 
+    !empty($currentCourse->only_attachments->where('is_active',1)->toArray()))
 
-				<iframe width="100%" height="600" src="{{url('storage/app/public/'.$courses_data->course_details->only_attachments[0]->file_path)}}" allowfullscreen></iframe>
+				<iframe width="100%" height="600" src="{{url('storage/app/public/'.$currentCourse->only_attachments[0]->file_path)}}" allowfullscreen></iframe>
 
 			@endif
 
-			@if(empty($courses_data->course_details->only_scorm->where('is_active',1)->toArray()) && 
-    empty($courses_data->course_details->other_videos->where('is_active',1)->toArray()) && 
-    empty($courses_data->course_details->only_attachments->where('is_active',1)->toArray()))
+			@if(empty($currentCourse->only_scorm->where('is_active',1)->toArray()) && 
+    empty($currentCourse->other_videos->where('is_active',1)->toArray()) && 
+    empty($currentCourse->only_attachments->where('is_active',1)->toArray()))
     <div class="no-video-message">
         <img src="{{asset('public/images/no-cer-found-image.jpg')}}" class="img-fluid mx-auto d-block" alt="">
         <h3>Videos are not available for this course</h3>
     </div>
 @endif
 
-				@foreach ($courses_data->course_details->only_scorm as $key => $value) 
+				@foreach ($currentCourse->only_scorm as $key => $value) 
 
 				<div class="Video_div mx-0" >
 
@@ -316,7 +317,7 @@
 
 
 
-				@foreach ($courses_data->course_details->other_videos->where('is_active',1) as $key => $value)
+				@foreach ($currentCourse->other_videos->where('is_active',1) as $key => $value)
     @php
         // Determine the video link based on type
         if ($value->type == 2) {
@@ -409,90 +410,158 @@
 					                            </div>
 					                        @endif
 					                        <?php $i=1; $pass_count=0; ?>
-				                        @if(empty($courses_data->course_details->assessments->toArray()))
-				                        <div>
-				                            <img src="{{ asset('public/images/no-cer-found-image.jpg') }}" class="img-fluid mx-auto d-block w-40" width="" alt="" />
-				                            <div class="no-data-found-text my-2">No data found</div>
-				                        </div>
-				                        @endif 
-				                        @foreach($courses_data->course_details->assessments->where('is_active',1) as $assessment)
+					                        @php
+					                            $targetCourse = $displayed_course ?? $courses_data->course_details;
+					                            $targetAssessments = $targetCourse->assessments ? $targetCourse->assessments->where('is_active', 1)->where('is_delete', 0) : collect();
+					                        @endphp
 
-										
-				                        @php
-    $assessmentAttempts = $assessment->assessment_all_results->where('assign_id', $courses_data->id);
-    if ($assessmentAttempts->contains(fn ($attempt) => $attempt->hasPassed())) {
-        $pass_count++;
-    }
-@endphp
+					                        @if($targetAssessments->isEmpty())
+					                            <div class="text-center py-3">
+					                                <img src="{{ asset('public/images/no-cer-found-image.jpg') }}" class="img-fluid mx-auto d-block w-40" width="" alt="" />
+					                                <div class="no-data-found-text my-2">No assessments found</div>
+					                            </div>
+					                        @else
+					                            @foreach($targetAssessments as $assessment)
+					                                @php
+					                                    $assessmentAttempts = $assessment->assessment_all_results->where('assign_id', $courses_data->id);
+					                                    if ($assessmentAttempts->isEmpty()) {
+					                                        $allType6Docs = \App\Models\Course_documents::where('course_id', $targetCourse->id)
+					                                            ->where('type', 6)
+					                                            ->where('is_delete', 0)
+					                                            ->get();
+					                                        $matchedDocIds = $allType6Docs->filter(function($d) use ($assessment) {
+					                                            return $d->id == $assessment->id || trim(strtolower($d->file_name)) === trim(strtolower($assessment->file_name));
+					                                        })->pluck('id')->toArray();
+					                                        $courseDocIds = !empty($matchedDocIds) ? $matchedDocIds : $allType6Docs->pluck('id')->toArray();
 
-				                        <div class="panel-body mt-2">
-				                            <div class="d-flex justify-content-between align-items-center my-1">
-				                                <div class="course-name font-weight-normal mx-0">
-				                                    <span>{{$i++}}. {{$assessment->file_name??''}} </span>
-				                                </div>
-				                            </div>
-				                            <div class="d-flex align-items-center justify-content-between">
-				                                <div class="my-2">
-				                                    @if($assessmentAttempts->isNotEmpty())
-				                                    <a href="#" data-id="{{$assessment->id}}" data-assign_id="{{$courses_data->id}}" class="text-violet font-weight-bold resultsView" data-bs-toggle="modal" data-bs-target="#resultsView">View Score</a>
-				                                    @endif
-				                                </div>
-				                                <div class="my-2">
-				                                    @include('user.courses.assessment_action', [
-    'actionClass' => 'p-2 text-violet font-weight-bold',
-    'reportLabel' => 'View Completed Report',
-])
-</div>
-				                            </div>
-				                        </div>
-				                        @endforeach
-				                        @php
-				                            $activeAssessments = $courses_data->course_details->assessments->where('is_active', 1)->where('is_delete', 0);
-				                            $assessmentsPassed = true;
-				                            if ($activeAssessments->count() > 0) {
-				                                foreach ($activeAssessments as $assDoc) {
-				                                    $hasPassedAss = $assDoc->assessment_all_results
-				                                        ->where('assign_id', $courses_data->id)
-				                                        ->first(fn ($att) => $att->hasPassed());
-				                                    if (!$hasPassedAss) {
-				                                        $assessmentsPassed = false;
-				                                        break;
-				                                    }
-				                                }
-				                            }
+					                                        $assessmentAttempts = \App\Models\Assessment_results::whereIn('course_document_id', $courseDocIds)
+					                                            ->where(function($q) use ($courses_data) {
+					                                                if ($courses_data->id) {
+					                                                    $q->where('assign_id', $courses_data->id)
+					                                                      ->orWhereNull('assign_id')
+					                                                      ->orWhere('assign_id', 0);
+					                                                }
+					                                            })
+					                                            ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+					                                            ->whereNull('deleted_at')
+					                                            ->get();
+					                                    }
+					                                    $latestThreeAttempts = $assessmentAttempts->sortBy('id')->values()->slice(-3)->values();
+					                                    if ($latestThreeAttempts->contains(fn ($attempt) => $attempt->hasPassed())) {
+					                                        $pass_count++;
+					                                    }
+					                                    $assDisplayName = trim($assessment->file_name ?? '');
+					                                    if (empty($assDisplayName)) {
+					                                        if (!empty($assessment->org_file_name)) {
+					                                            $assDisplayName = $assessment->org_file_name;
+					                                        } elseif (!empty($assessment->file_path)) {
+					                                            $parts = explode('/', trim($assessment->file_path, '/'));
+					                                            $slug = count($parts) > 1 ? $parts[1] : $parts[0];
+					                                            $assDisplayName = ucwords(str_replace(['-', '_'], ' ', $slug));
+					                                        } else {
+					                                            $assDisplayName = ($targetCourse->course_name ?? 'Course') . ' Assessment';
+					                                        }
+					                                    }
+					                                @endphp
 
-				                            $activeAssignmentExams = \App\Models\Course_documents::where('course_id', $courses_data->course_details->id)
-				                                ->where('type', 7)
-				                                ->where('is_active', 1)
-				                                ->where('is_delete', 0)
-				                                ->get();
-				                            $assignmentExamsPassed = true;
-				                            if ($activeAssignmentExams->count() > 0) {
-				                                foreach ($activeAssignmentExams as $couse_assign_exam) {
-				                                    $exam_details = \App\Models\Exam::where('exam_code', $couse_assign_exam->file_path)->first();
-				                                    if (!empty($exam_details)) {
-				                                        $exam_attempt = \App\Models\ExamAttempt::where('exam_id', $exam_details->id)
-				                                            ->where('user_id', Auth::id())
-				                                            ->where('course_id', $courses_data->course_details->id)
-				                                            ->first();
-				                                        if (empty($exam_attempt) || $exam_attempt->exam_result !== 'Passed') {
-				                                            $assignmentExamsPassed = false;
-				                                            break;
-				                                        }
-				                                    }
-				                                }
-				                            }
+					                                <div class="panel-body mt-2 mb-2 p-2 rounded bg-white border">
+					                                    <div class="d-flex justify-content-between align-items-center my-1">
+					                                        <div class="course-name font-weight-normal mx-0">
+					                                            <span>{{$i++}}. {{$assDisplayName}}</span>
+					                                        </div>
+					                                    </div>
+					                                    <div class="d-flex align-items-center justify-content-between">
+					                                        <div class="my-2">
+					                                            @if($assessmentAttempts->isNotEmpty())
+					                                            <a href="#" data-id="{{$assessment->id}}" data-assign_id="{{$courses_data->id}}" class="text-violet font-weight-bold resultsView" data-bs-toggle="modal" data-bs-target="#resultsView">View Score</a>
+					                                            @endif
+					                                        </div>
+					                                        <div class="my-2">
+					                                            @include('user.courses.assessment_action', [
+					                                                'actionClass' => 'p-2 text-violet font-weight-bold',
+					                                                'reportLabel' => 'View Completed Report',
+					                                            ])
+					                                        </div>
+					                                    </div>
+					                                </div>
+					                            @endforeach
+					                        @endif
 
-				                            $hasAnyRequirement = ($activeAssessments->count() > 0 || $activeAssignmentExams->count() > 0);
-				                            $isCourseCompleted = $hasAnyRequirement && $assessmentsPassed && $assignmentExamsPassed;
+					                        @php
+					                            $allCourseIds = collect([$courses_data->course_details->id]);
+					                            if ($courses_data->course_details->sub_courses && $courses_data->course_details->sub_courses->isNotEmpty()) {
+					                                $allCourseIds = $allCourseIds->merge($courses_data->course_details->sub_courses->pluck('id'));
+					                            }
 
-				                            if ($isCourseCompleted && $courses_data->status != 3) {
-				                                \App\Models\Asigneduser::where('id', $courses_data->id)->update(['status' => 3, 'completed_on' => date('Y-m-d H:i:s')]);
-				                                \App\Helpers\ActivityLog::log(auth()->user(), 'Completed a course: ' . ($courses_data->course_details->course_name ?? ''), 0);
-				                            } elseif (!$isCourseCompleted && $courses_data->status == 3 && $hasAnyRequirement) {
-				                                \App\Models\Asigneduser::where('id', $courses_data->id)->update(['status' => 1]);
-				                            }
-				                        @endphp
+					                            $activeAssessments = \App\Models\Course_documents::whereIn('course_id', $allCourseIds)
+					                                ->where('type', 6)
+					                                ->where('is_active', 1)
+					                                ->where('is_delete', 0)
+					                                ->get();
+					                            $assessmentsPassed = true;
+					                            if ($activeAssessments->count() > 0) {
+					                                foreach ($activeAssessments as $assDoc) {
+					                                    $hasPassedAss = $assDoc->assessment_all_results
+					                                        ->where('assign_id', $courses_data->id);
+					                                    if ($hasPassedAss->isEmpty()) {
+					                                        $mIds = \App\Models\Course_documents::where('course_id', $assDoc->course_id)
+					                                            ->where('type', 6)
+					                                            ->where('is_delete', 0)
+					                                            ->get()
+					                                            ->filter(fn($d) => $d->id == $assDoc->id || trim(strtolower($d->file_name)) === trim(strtolower($assDoc->file_name)))
+					                                            ->pluck('id')->toArray();
+					                                        $hasPassedAss = \App\Models\Assessment_results::whereIn('course_document_id', $mIds)
+					                                            ->where(function($q) use ($courses_data) {
+					                                                if ($courses_data->id) {
+					                                                    $q->where('assign_id', $courses_data->id)
+					                                                      ->orWhereNull('assign_id')
+					                                                      ->orWhere('assign_id', 0);
+					                                                }
+					                                            })
+					                                            ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+					                                            ->whereNull('deleted_at')
+					                                            ->get();
+					                                    }
+					                                    $passedInLatest3 = $hasPassedAss->sortBy('id')->values()->slice(-3)->values()->contains(fn($att) => $att->hasPassed());
+					                                    if (!$passedInLatest3) {
+					                                        $assessmentsPassed = false;
+					                                        break;
+					                                    }
+					                                }
+					                            }
+
+					                            $activeAssignmentExams = \App\Models\Course_documents::whereIn('course_id', $allCourseIds)
+					                                ->where('type', 7)
+					                                ->where('is_active', 1)
+					                                ->where('is_delete', 0)
+					                                ->get();
+					                            $assignmentExamsPassed = true;
+					                            if ($activeAssignmentExams->count() > 0) {
+					                                foreach ($activeAssignmentExams as $couse_assign_exam) {
+					                                    $exam_details = \App\Models\Exam::where('exam_code', $couse_assign_exam->file_path)->first();
+					                                    if (!empty($exam_details)) {
+					                                        $exam_attempt = \App\Models\ExamAttempt::where('exam_id', $exam_details->id)
+					                                            ->where('user_id', Auth::id())
+					                                            ->whereIn('course_id', $allCourseIds)
+					                                            ->first();
+					                                        if (empty($exam_attempt) || strtolower($exam_attempt->exam_result) !== 'passed') {
+					                                            $assignmentExamsPassed = false;
+					                                            break;
+					                                        }
+					                                    }
+					                                }
+					                            }
+
+					                            $hasAnyRequirement = ($activeAssessments->count() > 0 || $activeAssignmentExams->count() > 0);
+					                            $isCourseCompleted = $hasAnyRequirement && $assessmentsPassed && $assignmentExamsPassed;
+
+					                            if ($isCourseCompleted && $courses_data->status != 3) {
+					                                \App\Models\Asigneduser::where('id', $courses_data->id)->update(['status' => 3, 'completed_on' => date('Y-m-d H:i:s')]);
+					                                \App\Helpers\ActivityLog::log(auth()->user(), 'Completed a course: ' . ($courses_data->course_details->course_name ?? ''), 0);
+					                            } elseif (!$isCourseCompleted && $courses_data->status == 3 && $hasAnyRequirement) {
+					                                \App\Models\Asigneduser::where('id', $courses_data->id)->update(['status' => 1]);
+					                            }
+					                        @endphp
 				                    </div>
 				                </div>
 				            </div>
@@ -510,54 +579,61 @@
 				                <div class="accordion-body p-0">
 				                    <div id="downloads" class="">
 				                        <div class="panel-body">
-				                            <?php $i=1; ?>
-				                            @if(empty($courses_data->course_details->assignment_exam->toArray()))
-				                            <div>
-				                                <img src="{{ asset('public/images/no-cer-found-image.jpg') }}" class="img-fluid mx-auto d-block w-40" width="" alt="" />
-				                                <div class="no-data-found-text my-2">No data found</div>
-				                            </div>
-				                            @endif 
-											@foreach($courses_data->course_details->assignment_exam
-											->where('is_active', 1)
-											->unique(function ($assignment_exam) {
-												return optional($assignment_exam->assignment_exam_name)->id;
-											}) as $assignment_exam)
-				                            <div class="p-2 rounded-3">
-				                                <div class="row">
-				                                    <div class="col-12">
-				                                        <div class="d-flex justify-content-start align-items-center mb-1">
-				                                            <div>
-				                                                <div class="exam-name ms-0 lh18">
-				                                                    <a href="javascript:;" class="pdf_name font-weight-bold text-dark"> <span>{{$assignment_exam->assignment_exam_name->name??''}}</span></a>
-				                                                </div>
-				                                            </div>
-				                                        </div>
-				                                    </div>
+					                        @php
+					                            $targetCourse = $displayed_course ?? $courses_data->course_details;
+					                            $targetAssignmentExams = $targetCourse->assignment_exam ? $targetCourse->assignment_exam->where('is_active', 1)->unique(function ($ax) {
+					                                return optional($ax->assignment_exam_name)->id;
+					                            }) : collect();
+					                        @endphp
 
-				                                    @php $examId = $assignment_exam->assignment_exam_name->id ?? null; $attempted = $courses_data->assigned_exam_datas->where('exam_id', $examId)->first(); @endphp @if($attempted && $attempted->exam_result ==
-				                                    'Pending')
-				                                    <div class="col-12">
-				                                        <div class="bg-warning p-2 rounded-3">Your assignment exam has been submitted successfully. Results will be announced soon after evaluation.</div>
-				                                    </div>
-				                                    @elseif($attempted && $attempted->exam_result != 'Pending')
-
-				                                    <div class="my-1 text-end">
-				                                        <a
-				                                            href="{{ route('exams.Resultview') }}?course_id={{ $courses_data->course_id }}&exam_name={{ urlencode($assignment_exam->file_path) }}&ex_c={{ $assignment_exam->assignment_exam_name->id?? '' }}&attempt_id={{ $attempted->id }}"
-				                                            class="btn btn-sm text-nowrap p-2 web-btn"
-				                                        >
-				                                            View Result
-				                                        </a>
-				                                    </div>
-				                                    @else
-				                                    <div class="my-1 text-end">
-				                                        <a href="{{ route('exams.take') }}?course_id={{ $courses_data->course_id }}&exam_name={{ urlencode($assignment_exam->file_path) }}" class="btn btn-sm text-nowrap p-2 web-btn">Take Exam </a>
-				                                    </div>
-				                                    <!-- {{$assignment_exam->assignment_exam_name->id??0}}  -->
-				                                    @endif
-				                                </div>
-				                            </div>
-				                            @endforeach
+					                        @if($targetAssignmentExams->isEmpty())
+					                            <div class="text-center py-3">
+					                                <img src="{{ asset('public/images/no-cer-found-image.jpg') }}" class="img-fluid mx-auto d-block w-40" width="" alt="" />
+					                                <div class="no-data-found-text my-2">No assignment exams found</div>
+					                            </div>
+					                        @else
+					                            @foreach($targetAssignmentExams as $assignment_exam)
+					                                <div class="p-2 rounded-3 mb-2 bg-white border">
+					                                    <div class="row">
+					                                        <div class="col-12">
+					                                            <div class="d-flex justify-content-start align-items-center mb-1">
+					                                                <div class="exam-name ms-0 lh18">
+					                                                    <span class="font-weight-bold text-dark">{{$assignment_exam->assignment_exam_name->name??''}}</span>
+					                                                </div>
+					                                            </div>
+					                                        </div>
+					                                        @php
+					                                            $examId = $assignment_exam->assignment_exam_name->id ?? null;
+					                                            $activeCourseId = $displayed_course->id ?? $courses_data->course_id;
+					                                            if (isset($active_sub_course) && $active_sub_course) {
+					                                                $attempted = \App\Models\ExamAttempt::where('exam_id', $examId)
+					                                                    ->where('user_id', Auth::id())
+					                                                    ->where('course_id', $activeCourseId)
+					                                                    ->latest('id')
+					                                                    ->first();
+					                                                $examCourseId = $activeCourseId;
+					                                            } else {
+					                                                $attempted = $courses_data->assigned_exam_datas->where('exam_id', $examId)->first();
+					                                                $examCourseId = $courses_data->course_id;
+					                                            }
+					                                        @endphp
+					                                        @if($attempted && $attempted->exam_result == 'Pending')
+					                                            <div class="col-12">
+					                                                <div class="bg-warning p-2 rounded-3" style="font-size:12px;">Submitted successfully. Results will be announced soon.</div>
+					                                            </div>
+					                                        @elseif($attempted && $attempted->exam_result != 'Pending')
+					                                            <div class="my-1 text-end">
+					                                                <a href="{{ route('exams.Resultview') }}?course_id={{ $examCourseId }}&exam_name={{ urlencode($assignment_exam->file_path) }}&ex_c={{ $assignment_exam->assignment_exam_name->id?? '' }}&attempt_id={{ $attempted->id }}" class="btn btn-sm text-nowrap p-2 web-btn">View Result</a>
+					                                            </div>
+					                                        @else
+					                                            <div class="my-1 text-end">
+					                                                <a href="{{ route('exams.take') }}?course_id={{ $examCourseId }}&exam_name={{ urlencode($assignment_exam->file_path) }}" class="btn btn-sm text-nowrap p-2 web-btn">Take Exam</a>
+					                                            </div>
+					                                        @endif
+					                                    </div>
+					                                </div>
+					                            @endforeach
+					                        @endif
 				                        </div>
 				                    </div>
 				                </div>
@@ -578,13 +654,13 @@
 				                    <div id="downloads" class="">
 				                        <div class="panel-body">
 				                            <?php $i=1; ?>
-				                            @if(empty($courses_data->course_details->only_attachments->toArray()))
+				                            @if(empty($currentCourse->only_attachments->where('is_active',1)->toArray()))
 				                            <div>
 				                                <img src="{{ asset('public/images/no-cer-found-image.jpg') }}" class="img-fluid mx-auto d-block w-40" width="" alt="" />
 				                                <div class="no-data-found-text my-2">No data found</div>
 				                            </div>
 				                            @endif 
-											@foreach($courses_data->course_details->only_attachments->where('is_active',1) as $attachment)
+											@foreach($currentCourse->only_attachments->where('is_active',1) as $attachment)
 
 				                            <div class="py-2 rounded-3 shadow-border mb-2 px-2">
 				                                <div class="row">

@@ -184,6 +184,9 @@
         font-size: 0.82rem;
         display: inline-block;
     }
+    .course-name {
+        text-decoration: none !important;
+    }
 </style>
     <!-- <div>
         <h4 class="mb-1 course-name font-weight-bold">{{$courses_data->course_details->course_name??''}}</h4>
@@ -198,8 +201,16 @@
                 @endif
             </div>
             <div class="ms-2 ms-lg-3">
-                <div class="mb-1 course-name font-weight-bold">{{$courses_data->course_details->course_name??''}}</div>
-                <div class="fs-7 my-course-categori-name py-1">
+                <div class="mb-1 course-name font-weight-bold">
+                    @if(!empty($courses_data->course_details->parent_id))
+                        <span class="badge me-1" style="background:#005452; color:#fff; font-size:10px; font-weight:500; padding:2px 6px; border-radius:3px;">Sub Course</span>
+                    @endif
+                    {{$courses_data->course_details->course_name??''}}
+                    @if(!empty($courses_data->course_details->parent_course))
+                        <small class="text-muted ms-1" style="font-size:12px; font-weight:normal;">(Parent Course: {{ $courses_data->course_details->parent_course->course_name }})</small>
+                    @endif
+                </div>
+                <div class="fs-7 my-course-categori-name py-1 d-flex align-items-center flex-wrap">
                     <span class="dashed-border-category-icon"><i class="fa-solid fa-folder-tree"></i></span>
                     <span class="ps-1">{{$courses_data->course_details->category_details->category_name??''}}</span>
                 </div>
@@ -384,7 +395,7 @@
                                         </div>
                                         <div class="pl-3">
                                            
-                                            <div><a href="{{url('start_course')}}?id={{$courses_data->id}}"><h6 class="mb-0 darkk-theme-text">{{$attachment->file_name??''}}</h6></a></div>
+                                            <div><a href="{{url('start_course')}}?id={{$courses_data->id}}@if(!empty($courses_data->course_details->parent_id))&course_id={{$courses_data->course_details->id}}@endif"><h6 class="mb-0 darkk-theme-text">{{$attachment->file_name??''}}</h6></a></div>
                                             
                                         </div>
                                     </div>
@@ -425,17 +436,44 @@
                                                                         // Fetch all assessment results for the current assessment and user
                                                                         $results = $assessment->assessment_all_results
                                                                             ->where('assign_id', $courses_data->id);
-                                                                        $attemptsCount = min(3, $results->count());
-                                                                        $passedAttempt = $results->sortBy('id')->values()->first(fn ($attempt) => $attempt->hasPassed());
+                                                                        if ($results->isEmpty()) {
+                                                                            $allType6Docs = \App\Models\Course_documents::where('course_id', $courses_data->course_id)
+                                                                                ->where('type', 6)
+                                                                                ->where('is_delete', 0)
+                                                                                ->get();
+                                                                            $matchedDocIds = $allType6Docs->filter(function($d) use ($assessment) {
+                                                                                return $d->id == $assessment->id || trim(strtolower($d->file_name)) === trim(strtolower($assessment->file_name));
+                                                                            })->pluck('id')->toArray();
+                                                                            $courseDocIds = !empty($matchedDocIds) ? $matchedDocIds : $allType6Docs->pluck('id')->toArray();
+
+                                                                            $results = \App\Models\Assessment_results::whereIn('course_document_id', $courseDocIds)
+                                                                                ->where(function($q) use ($courses_data) {
+                                                                                    if ($courses_data->id) {
+                                                                                        $q->where('assign_id', $courses_data->id)
+                                                                                          ->orWhereNull('assign_id')
+                                                                                          ->orWhere('assign_id', 0);
+                                                                                    }
+                                                                                })
+                                                                                ->where('user_id', $courses_data->user_id ?? \Illuminate\Support\Facades\Auth::id())
+                                                                                ->whereNull('deleted_at')
+                                                                                ->get();
+                                                                        }
+                                                                        $latestThreeAttempts = $results->sortBy('id')->values()->slice(-3)->values();
+                                                                        $attemptsCount = min(3, $latestThreeAttempts->count());
+                                                                        $passedAttempt = $latestThreeAttempts->first(fn ($attempt) => $attempt->hasPassed());
                                                                         
-                                                                        // Assuming you want the most recent result for display
-                                                                        $latestResult = $results->sortByDesc('id')->first();
-                                                                        $resultData = $latestResult ? (json_decode($latestResult->result_data, true) ?: ['results' => json_decode($latestResult->results, true)]) : null;
-                                                                        $passOrFail = $passedAttempt ? 'Passed' : ($resultData['results']['pass_or_fail'] ?? 'Not Attempted');
+                                                                        // Most recent result for display
+                                                                        $latestResult = $latestThreeAttempts->last();
+                                                                        $resultData = null;
+                                                                        if ($latestResult) {
+                                                                            $payload = json_decode($latestResult->result_data ?? '', true);
+                                                                            $resultData = $payload['results'] ?? json_decode($latestResult->results ?? '', true);
+                                                                        }
+                                                                        $passOrFail = $passedAttempt ? 'Passed' : ($resultData['pass_or_fail'] ?? ($attemptsCount > 0 ? 'Failed' : 'Not Attempted'));
                                                                         
                                                                         $ordinal = [1 => '1st', 2 => '2nd', 3 => '3rd'];
                                                                         if ($passOrFail === 'Passed' && $passedAttempt) {
-                                                                            $passedIndex = $results->sortBy('id')->values()->search(fn ($att) => $att->id === $passedAttempt->id);
+                                                                            $passedIndex = $latestThreeAttempts->search(fn ($att) => $att->id === $passedAttempt->id);
                                                                             $attemptNum = min(3, ($passedIndex !== false ? $passedIndex + 1 : 1));
                                                                         } else {
                                                                             $attemptNum = min(3, max(1, $attemptsCount));
@@ -571,10 +609,14 @@
                                     </div>
                                 </div>
                                 @if(!empty($reportData['has_multiple_assessments']))
-                                    <div class="ms-auto" style="min-width: 170px; max-width: 240px;">
-                                        <select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">
+                                    <div class="ms-auto flex-shrink-0" style="max-width: 50%;">
+                                        <select class="form-select form-select-sm report-assessment-select" title="{{ $reportData['assessment_options'][0]['name'] ?? '' }}" style="font-size: 12px; height: 30px; padding: 2px 24px 2px 8px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 190px; width: 100%; background-color: #fff;">
                                             @foreach(($reportData['assessment_options'] ?? []) as $index => $opt)
-                                                <option value="{{ $opt['key'] }}" {{ $index === 0 ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                                                @php
+                                                    $optFullName = $opt['name'];
+                                                    $optShortName = mb_strlen($optFullName) > 20 ? mb_substr($optFullName, 0, 18) . '...' : $optFullName;
+                                                @endphp
+                                                <option value="{{ $opt['key'] }}" title="{{ $optFullName }}" {{ $index === 0 ? 'selected' : '' }}>{{ $optShortName }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -590,11 +632,14 @@
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
-                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="report-label mb-1">Result</div>
                                         <div class="mt-1 report-stat-badge">
-                                            @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
+                                            @php
+                                                $passedInVal = strtolower(trim($reportData['passed_in'] ?? ''));
+                                            @endphp
+                                            @if($passedInVal === 'passed' || str_starts_with($passedInVal, 'passed'))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
-                                            @elseif(($reportData['passed_in'] ?? '') === 'Failed')
+                                            @elseif($passedInVal === 'failed' || str_starts_with($passedInVal, 'failed'))
                                                 <span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>
                                             @else
                                                 <span class="report-badge-neutral">{{ $reportData['passed_in'] ?? 'Not Attempted' }}</span>
@@ -765,10 +810,14 @@
                                     </div>
                                 </div>
                                 @if(!empty($reportData['has_multiple_assessments']))
-                                    <div class="ms-auto" style="min-width: 170px; max-width: 240px;">
-                                        <select class="form-select form-select-sm report-assessment-select" style="font-size: 0.8rem; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer;">
+                                    <div class="ms-auto flex-shrink-0" style="max-width: 50%;">
+                                        <select class="form-select form-select-sm report-assessment-select" title="{{ $reportData['assessment_options'][0]['name'] ?? '' }}" style="font-size: 12px; height: 30px; padding: 2px 24px 2px 8px; border-radius: 6px; border-color: #cbd5e1; font-weight: 500; cursor: pointer; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 190px; width: 100%; background-color: #fff;">
                                             @foreach(($reportData['assessment_options'] ?? []) as $index => $opt)
-                                                <option value="{{ $opt['key'] }}" {{ $index === 0 ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                                                @php
+                                                    $optFullName = $opt['name'];
+                                                    $optShortName = mb_strlen($optFullName) > 20 ? mb_substr($optFullName, 0, 18) . '...' : $optFullName;
+                                                @endphp
+                                                <option value="{{ $opt['key'] }}" title="{{ $optFullName }}" {{ $index === 0 ? 'selected' : '' }}>{{ $optShortName }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -784,11 +833,14 @@
                                 </div>
                                 <div class="col-6">
                                     <div class="p-2 rounded bg-light border">
-                                        <div class="report-label mb-1">Passed In</div>
+                                        <div class="report-label mb-1">Result</div>
                                         <div class="mt-1 report-stat-badge">
-                                            @if(($reportData['passed_in'] ?? '') === 'Passed' || (!empty($reportData['passed_in']) && str_contains(strtolower($reportData['passed_in']), 'attempt')))
+                                            @php
+                                                $passedInVal = strtolower(trim($reportData['passed_in'] ?? ''));
+                                            @endphp
+                                            @if($passedInVal === 'passed' || str_starts_with($passedInVal, 'passed'))
                                                 <span class="report-badge-pass"><i class="fa-solid fa-circle-check me-1"></i>Passed</span>
-                                            @elseif(($reportData['passed_in'] ?? '') === 'Failed')
+                                            @elseif($passedInVal === 'failed' || str_starts_with($passedInVal, 'failed'))
                                                 <span class="report-badge-fail"><i class="fa-solid fa-circle-xmark me-1"></i>Failed</span>
                                             @else
                                                 <span class="report-badge-neutral">{{ $reportData['passed_in'] ?? 'Not Attempted' }}</span>
@@ -1128,6 +1180,7 @@
         var data = optionsMap ? optionsMap[selectedKey] : null;
         if (!data) return;
 
+        $(this).attr('title', data.name);
         card.find('.report-stat-attempts').text(data.attempts);
 
         var badgeHtml = '';

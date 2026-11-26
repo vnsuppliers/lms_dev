@@ -22,7 +22,18 @@ class UserExamController extends Controller
     public function showExamForm(Request $request)
     {
         //dd($request->all());
-        $course_document = Course_documents::where('file_path', $request->query('exam_name'))->where('is_active','=',1)->where('course_id',$request->course_id)->first();
+        $course = Courses::find($request->course_id);
+        $lookupCourseIds = [$request->course_id];
+        if ($course && $course->parent_id) {
+            $lookupCourseIds[] = $course->parent_id;
+        }
+
+        $course_document = Course_documents::where('file_path', $request->query('exam_name'))
+            ->where('is_active', '=', 1)
+            ->where('is_delete', 0)
+            ->whereIn('course_id', $lookupCourseIds)
+            ->first();
+
         if (!$course_document) {
         //abort(404, 'Exam not found');
           return redirect()->back()->with('error', 'Exam not found or inactive');
@@ -53,10 +64,15 @@ class UserExamController extends Controller
 
         $userId = Auth::id();
         $courseId = $request->input('course_id');
+        $course = Courses::find($courseId);
+        $lookupCourseIds = [$courseId];
+        if ($course && $course->parent_id) {
+            $lookupCourseIds[] = $course->parent_id;
+        }
 
         // Retrieve the assigned user record
         $assignedUser = Asigneduser::where('user_id', $userId)
-                                   ->where('course_id', $courseId)
+                                   ->whereIn('course_id', $lookupCourseIds)
                                    ->orderByDesc('id')
                                    ->first();
 
@@ -64,7 +80,7 @@ class UserExamController extends Controller
             return redirect()->back()->with('error', 'User is not assigned to this course.');
         }
 
-        abort_unless(Course_documents::where('course_id', $courseId)
+        abort_unless(Course_documents::whereIn('course_id', $lookupCourseIds)
             ->where('type', 7)->where('file_path', $exam->exam_code)
             ->where('is_active', 1)->where('is_delete', 0)->exists(), 404, 'Exam not available for this course.');
 
@@ -227,8 +243,14 @@ class UserExamController extends Controller
         }
 
         if (!$examAttempt && $userId && $courseId) {
+            $course = Courses::find($courseId);
+            $lookupCourseIds = [$courseId];
+            if ($course && $course->parent_id) {
+                $lookupCourseIds[] = $course->parent_id;
+            }
+
             $assignedUser = Asigneduser::where('user_id', $userId)
-                                       ->where('course_id', $courseId)
+                                       ->whereIn('course_id', $lookupCourseIds)
                                        ->latest('id')
                                        ->first();
             if ($assignedUser) {

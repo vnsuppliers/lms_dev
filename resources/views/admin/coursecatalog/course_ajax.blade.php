@@ -13,6 +13,16 @@
                         </div>
                         <div class="ps-3">
                             <div class="mb-1 course-name font-weight-bold">{{$course->course_name??''}}</div>
+                            @if($course->parent_id && $course->parent_course)
+                            <div class="py-1">
+                                <span class="badge" style="background:#e6f4f2; color:#005452; border:1px solid #b2dfdb; font-size:11px; padding:4px 8px;">
+                                    <i class="fa-solid fa-layer-group me-1"></i> Sub Course of: 
+                                    <a href="javascript:;" data-id="{{ $course->parent_id }}" class="user_check text-decoration-underline fw-bold" style="color:#005452;">
+                                        {{ $course->parent_course->course_name }}
+                                    </a>
+                                </span>
+                            </div>
+                            @endif
                             <div class="py-1 sub-categories-styles d-flex align-items-center" value="{{$course->category_details->id??''}}"><span class="dashed-border-category-icon"><i class="fa-solid fa-folder-tree"></i></span><span class="ps-2">{{$course->category_details->category_name??''}}</span></div>
                             <div class="py-1 sub-categories-styles d-flex align-items-center" ><span class="dashed-border-category-icon" style="font-size: 9px;padding: 3px 5px;"><i class="fa-solid fa-calendar-days"></i></span><span class="ps-2">Created on : <?php echo \Carbon\Carbon::createFromTimeStamp(strtotime($course->created_at))->format('M d, Y'); ?></span></div>
                         </div>
@@ -48,18 +58,26 @@
             <div class="mt-3" id="course_ajax_pop">
                 <nav>
                     <div class="nav nav-tabs font-smallsize" id="nav-tab" role="tablist">
-                        <button class="nav-link nav-linkk active" id="about-course-tab" data-bs-toggle="tab" data-bs-target="#about-course" type="button" role="tab" aria-controls="about-course" aria-selected="true">About the Course</button>
+                        @php
+                            $curActiveTab = $active_tab ?? 'about-course';
+                        @endphp
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'about-course' ? 'active' : '' }}" id="about-course-tab" data-bs-toggle="tab" data-bs-target="#about-course" type="button" role="tab" aria-controls="about-course" aria-selected="{{ $curActiveTab == 'about-course' ? 'true' : 'false' }}">About the Course</button>
                         {{-- @php dump('COURSE ID => '.$course->id); @endphp --}}
-                        <button class="nav-link nav-linkk" id="course-content-tab" data-bs-toggle="tab" data-bs-target="#course-content" type="button" role="tab" aria-controls="course-content" aria-selected="true">Course Content</button>
-                        <button class="nav-link nav-linkk" id="assign-users-subtab" data-bs-toggle="tab" data-bs-target="#assignUsersSubTab" type="button" role="tab" aria-controls="assignUsersSubTab" aria-selected="true">Assign Users</button>
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'course-content' ? 'active' : '' }}" id="course-content-tab" data-bs-toggle="tab" data-bs-target="#course-content" type="button" role="tab" aria-controls="course-content" aria-selected="{{ $curActiveTab == 'course-content' ? 'true' : 'false' }}">Course Content</button>
+                        @if(empty($course->parent_id))
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'sub-courses' ? 'active' : '' }}" id="sub-courses-tab" data-bs-toggle="tab" data-bs-target="#sub-courses" type="button" role="tab" aria-controls="sub-courses" aria-selected="{{ $curActiveTab == 'sub-courses' ? 'true' : 'false' }}">
+                            Sub Courses <span class="badge rounded-pill ms-1" style="background:#005452; color:#fff; font-size:11px;">{{ isset($course->sub_courses) ? $course->sub_courses->count() : 0 }}</span>
+                        </button>
+                        @endif
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'assignUsersSubTab' ? 'active' : '' }}" id="assign-users-subtab" data-bs-toggle="tab" data-bs-target="#assignUsersSubTab" type="button" role="tab" aria-controls="assignUsersSubTab" aria-selected="{{ $curActiveTab == 'assignUsersSubTab' ? 'true' : 'false' }}">Assign Users</button>
                         <!-- <button class="nav-link nav-linkk" id="learning-path-tab" data-bs-toggle="tab" data-bs-target="#learningPath" type="button" role="tab" aria-controls="learningPath" aria-selected="true">Learning Path</button> -->
-                        <button class="nav-link nav-linkk" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab" aria-controls="reports" aria-selected="true">Reports</button>
-                        <button class="nav-link nav-linkk" id="manage-groups-tab" data-bs-toggle="tab" data-bs-target="#manageGroups" type="button" role="tab" aria-controls="manageGroups" aria-selected="true">Manage Groups Assign</button> 
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'reports' ? 'active' : '' }}" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab" aria-controls="reports" aria-selected="{{ $curActiveTab == 'reports' ? 'true' : 'false' }}">Reports</button>
+                        <button class="nav-link nav-linkk {{ $curActiveTab == 'manageGroups' ? 'active' : '' }}" id="manage-groups-tab" data-bs-toggle="tab" data-bs-target="#manageGroups" type="button" role="tab" aria-controls="manageGroups" aria-selected="{{ $curActiveTab == 'manageGroups' ? 'true' : 'false' }}">Manage Groups Assign</button> 
                     </div> 
                 </nav>
 
                 <div class="tab-content border-0 mt-0 pl-0 py-0 pr-1 admin-course-det-height height-100vh" id="myTabContent">
-                    <div class="tab-pane fade show active card-border border-top-0" id="about-course" role="tabpanel" aria-labelledby="about-course-tab">
+                    <div class="tab-pane fade {{ $curActiveTab == 'about-course' ? 'show active' : '' }} card-border border-top-0" id="about-course" role="tabpanel" aria-labelledby="about-course-tab">
 
                         <div class="row">
                             <div class="col-12 col-sm-12 col-md-12 col-lg-12 px-3">
@@ -888,141 +906,230 @@
                      <div class="tab-pane fade border-top-0" id="course-content" role="tabpanel" aria-labelledby="course-content">
                         <div class="row">
                             <div class="col-12">
-                                            <div class="form-group row mt-2">
-                                                <div class="col-12">
-                                                    <!-- <label class="mb-3 d-flex align-items-center"><i class="fa-solid fa-paperclip headings-icon"></i>Course Content</label> -->
-                                                </div>
-                                                <div class="text-right">
-                                                <input type="checkbox" id="toggleInactive">
-                                                    <label for="toggleInactive">Show Inactive Content Also</label>
-                                                </div>
-                                                <div class="col-12">
-                                                    <div class="table-responsive">
-                                                        <table class="table">
-                                                            <thead>
-                                                                <tr class="brd">
-                                                                    <th>
-                                                                        Type
-                                                                    </th>
-                                                                    <th>Name</th>
-                                                                    <th>
-                                                                        Link / File
-                                                                    </th>
-                                                                    <th>
-                                                                        Status
-                                                                    </th>
-                                                                    <th>Action</th>
-                                                                    <!-- <th>Action</th> -->
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody id="upload_files_list">
-
-                                                                 @if(isset($course->documents_details))
-                                                                    @foreach($course->assessments as $doc)
-                                                             
-                                                                <tr class="{{ $doc->is_active ? 'active' : 'inactive' }}">
-                                                                    <td>@if($doc->type==1)
-                                                                        Amazon Link
-                                                                        @elseif($doc->type==2)
-                                                                        Youtube Link
-                                                                        @elseif($doc->type==3)
-                                                                        Local Video
-                                                                        @elseif($doc->type==4)
-                                                                        Scorm Video
-                                                                        @elseif($doc->type==5)
-                                                                        Attachments
-                                                                        @elseif($doc->type==6)
-                                                                        Assessment
-                                                                        @elseif($doc->type==7)
-                                                                        Assignment
-                                                                    @endif</td>
-                                                                    <td>
-                                                                        @if($doc->type != 7)
-                                                                        {{$doc->file_name??''}}
-                                                                        @else
-                                                                        {{-- {{$doc->assignment_exam_name->name??''}} --}}
-                                                                        @endif
-                                                                    </td>
-
-                                                                    <td>
-                                                                        <!-- @if($doc->type==5)
-                                                                        <a href="{{url('storage/app/public/'.$doc->file_path)}}" target="blank" class="btn sbmt-btn text-nowrap">view</a>
-                                                                        @else
-                                                                        {{$doc->file_path}}
-                                                                    @endif  -->
-
-                                                                     @if($doc->type==5)
-                                                                    <a class="web-btn-sm" href="{{url('storage/app/public/'.$doc->file_path)}}" target="_blank"> <span>View File</span> </a>
-                                                                    @elseif($doc->type == 3 || $doc->type == 4)
-                                                                    {{ basename($doc->file_path) }}
+                                <div class="form-group row mt-2">
+                                    <div class="col-12">
+                                    </div>
+                                    <div class="text-right">
+                                        <input type="checkbox" id="toggleInactive">
+                                        <label for="toggleInactive">Show Inactive Content Also</label>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="table-responsive">
+                                            <table class="table">
+                                                <thead>
+                                                    <tr class="brd">
+                                                        <th style="width: 15%">Type</th>
+                                                        <th>Name</th>
+                                                        <th>Link / File</th>
+                                                        <th>Status</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="upload_files_list">
+                                                    @if(isset($course->assessments) && $course->assessments->count() > 0)
+                                                        @foreach($course->assessments as $assess)
+                                                            @php
+                                                                $displayName = trim($assess->file_name ?? '');
+                                                                if (empty($displayName)) {
+                                                                    if (!empty($assess->org_file_name)) {
+                                                                        $displayName = $assess->org_file_name;
+                                                                    } elseif (!empty($assess->file_path)) {
+                                                                        $parts = explode('/', trim($assess->file_path, '/'));
+                                                                        $slug = count($parts) > 1 ? $parts[1] : $parts[0];
+                                                                        $displayName = ucwords(str_replace(['-', '_'], ' ', $slug));
+                                                                    } else {
+                                                                        $displayName = ($course->course_name ?? 'Course') . ' Assessment';
+                                                                    }
+                                                                }
+                                                            @endphp
+                                                            <tr class="{{ $assess->is_active ? 'active' : 'inactive' }}">
+                                                                <td>
+                                                                    @if($assess->type==1)
+                                                                        <span>Amazon Link</span>
+                                                                    @elseif($assess->type==2)
+                                                                        <span>Youtube Link</span>
+                                                                    @elseif($assess->type==3)
+                                                                        <span>Local Video</span>
+                                                                    @elseif($assess->type==4)
+                                                                        <span>Scorm Video</span>
+                                                                    @elseif($assess->type==5)
+                                                                        <span>Attachments</span>
+                                                                    @elseif($assess->type==6)
+                                                                        <span>Assessment</span>
+                                                                    @elseif($assess->type==7)
+                                                                        <span>Assignment</span>
+                                                                    @endif
+                                                                </td>
+                                                                <td>{{ $displayName }}</td>
+                                                                <td>
+                                                                    @if($assess->type==5)
+                                                                        <a class="web-btn-sm" href="{{url('storage/app/public/'.$assess->file_path)}}" target="_blank"><span>View File</span></a>
+                                                                    @elseif($assess->type == 3 || $assess->type == 4)
+                                                                        {{ basename($assess->file_path) }}
                                                                     @else
-                                                                    {{ $doc->file_path }}
+                                                                        {{ $assess->file_path }}
                                                                     @endif
                                                                 </td>
                                                                 <td>
-                                                                                                                                                                
-                                                                   <div class="custom-control custom-switch">
-                                                                     <input type="checkbox" class="custom-control-input toggle-classdocument document-toggle"
-                                                                           id="toggle-document-{{ $doc->id }}"
-                                                                           data-document_id="{{ $doc->id }}"
-                                                                           @if($doc->is_active) checked @endif>
-                                                                    <label class="custom-control-label" for="toggle-document-{{ $doc->id }}"></label>
-
-                                                                   </div>
-                                                                   <div>
-                                                                  <span>Expries on: <strong>{{ date('d/m/Y', strtotime($doc->expiration_date)) }}</strong></span>
-                                                                   </div>
+                                                                    <div class="custom-control custom-switch">
+                                                                        <input type="checkbox" class="custom-control-input toggle-classdocument document-toggle" id="toggle-document-{{ $assess->id }}" data-document_id="{{ $assess->id }}" @if($assess->is_active) checked @endif>
+                                                                        <label class="custom-control-label" for="toggle-document-{{ $assess->id }}"></label>
+                                                                    </div>
+                                                                    <span class="d-block" style="font-size: 11px;">Expries on: {{ $assess->expiration_date && $assess->expiration_date != '1970-01-01 00:00:00' ? date('d/m/Y', strtotime($assess->expiration_date)) : 'N/A' }}</span>
                                                                 </td>
                                                                 <td>
-                                                                    <button type="button"
-                                                                            class="btn btn-sm btn-outline-warning reassign-assessment-all"
-                                                                            data-assessment-id="{{ $doc->id }}"
-                                                                            data-assessment-name="{{ $doc->file_name ?? 'Assessment' }}"
-                                                                            {{ !$doc->is_active ? 'disabled' : '' }}>
-                                                                        Reassign to All
-                                                                    </button>
+                                                                    @if($assess->type == 6)
+                                                                        <button type="button" class="btn btn-sm btn-outline-warning reassign-assessment-all" data-assessment-id="{{ $assess->id }}" data-assessment-name="{{ $displayName }}" {{ !$assess->is_active ? 'disabled' : '' }}>Reassign to All</button>
+                                                                    @endif
                                                                 </td>
-                                                                
-
-                                                               
-                                                                    <!-- <td>
-                                                                         <div class="dropdown text-center">
-                                                                            <button class="btn btn-transparent vm-toggle dropdown-toggle" type="button" id="vm-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                                                                <i class="fa-solid fa-ellipsis-vertical"></i>
-                                                                            </button>
-                                                                            <ul class="dropdown-menu vm-menu" aria-labelledby="vm-dropdown">
-                                                                                <li>
-                                                                                    @if($doc->type==5)
-                                                                                    <a class="dropdown-item" href="{{url('storage/app/public/'.$doc->file_path)}}"><i class="fa-solid fa-eye pr-2"></i> View</a>
-                                                                                    @elseif($doc->type == 3 || $doc->type == 4)
-                                                                                    {{ basename($doc->file_path) }}
-                                                                                    @else
-                                                                                    {{ $doc->file_path }}
-                                                                                    @endif
-                                                                                </li> 
-                                                                                <li><a class="dropdown-item content_delete" href="{{url('delete_document')}}?id={{$doc->id}}" title="{{__('Delete')}}" class=""><i class="fa-solid fa-trash" style="padding-right: 13px;"></i>Delete</a></li>
-                                                                            </ul>
-                                                                        </div>
-                                                                        <a href="{{url('delete_document')}}?id={{$doc->id}}" onclick="return confirm('Are you sure?')" class="btn btn-danger buttonn">Delete</a>
-                                                                    </td> -->
-
-                                                                </tr>
-                                                                @endforeach
-                                                                @endif
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                            </tr>
+                                                        @endforeach
+                                                    @else
+                                                        <tr>
+                                                            <td colspan="5" class="text-center text-muted">No content found</td>
+                                                        </tr>
+                                                    @endif
+                                                </tbody>
+                                            </table>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    @if(empty($course->parent_id))
+                    <div class="tab-pane fade {{ $curActiveTab == 'sub-courses' ? 'show active' : '' }} border-top-0" id="sub-courses" role="tabpanel" aria-labelledby="sub-courses-tab">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group row mt-2">
+                                    <div class="col-12">
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 px-3">
+                                        <a href="{{ url('coursecatalog?tab=1') }}&parent_course_id={{ $course->id }}" class="btn btn-sm text-white" style="background-color: #005452;">
+                                            <i class="fa-solid fa-plus me-1"></i> Add Sub Course
+                                        </a>
+                                        <div class="text-right">
+                                            <input type="checkbox" id="toggleInactiveSub">
+                                            <label for="toggleInactiveSub" class="mb-0 cursor-pointer">Show Inactive Content Also</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="table-responsive">
+                                            <table class="table">
+                                                <thead>
+                                                    <tr class="brd">
+                                                        <th style="width: 15%">Type</th>
+                                                        <th>Name</th>
+                                                        <th>Link / File</th>
+                                                        <th>Status</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="upload_sub_files_list">
+                                                    @if(isset($course->sub_courses) && $course->sub_courses->count() > 0)
+                                                        @foreach($course->sub_courses as $sub)
+                                                            <tr style="background: #f1f5f9; border-top: 2px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">
+                                                                <td colspan="5" class="py-2 px-3">
+                                                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                                        <div class="d-flex align-items-center">
+                                                                            <i class="fa-solid fa-layer-group me-2" style="color: #005452; font-size: 15px;"></i>
+                                                                            <span style="color: #005452; font-weight: 700; font-size: 14px;">Sub Course: {{ $sub->course_name }}</span>
+                                                                        </div>
+                                                                        <div class="d-flex align-items-center gap-2">
+                                                                            <a href="{{ url('coursecatalog?tab=1&id='.$sub->id.'&edit=1&parent_course_id='.$course->id) }}" class="btn btn-sm" style="color: #005452; border: 1px solid #005452; background: #fff; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 4px;" title="Edit Sub Course: {{ $sub->course_name }}">
+                                                                                <i class="fa-solid fa-pen-to-square me-1"></i> Edit Sub Course
+                                                                            </a>
+                                                                            <button type="button" class="btn btn-sm course-delete-btn" style="color: #64748b; border: 1px solid #cbd5e1; background: #fff; font-size: 12px; padding: 4px 9px; border-radius: 4px;" data-toggle="modal" data-target="#deleteCourseModal" data-id="{{ $sub->id }}" data-name="{{ $sub->course_name }}" data-parent-id="{{ $course->id }}" title="Delete Sub Course: {{ $sub->course_name }}">
+                                                                                <i class="fa-solid fa-trash"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                            @if(isset($sub->assessments) && $sub->assessments->count() > 0)
+                                                                @foreach($sub->assessments as $assess)
+                                                                    @php
+                                                                        $displayName = trim($assess->file_name ?? '');
+                                                                        if (empty($displayName)) {
+                                                                            if (!empty($assess->org_file_name)) {
+                                                                                $displayName = $assess->org_file_name;
+                                                                            } elseif (!empty($assess->file_path)) {
+                                                                                $parts = explode('/', trim($assess->file_path, '/'));
+                                                                                $slug = count($parts) > 1 ? $parts[1] : $parts[0];
+                                                                                $displayName = ucwords(str_replace(['-', '_'], ' ', $slug));
+                                                                            } else {
+                                                                                $displayName = ($sub->course_name ?? 'Sub Course') . ' Assessment';
+                                                                            }
+                                                                        }
+                                                                    @endphp
+                                                                    <tr class="{{ $assess->is_active ? 'active' : 'inactive' }}">
+                                                                        <td>
+                                                                            @if($assess->type==1)
+                                                                                <span>Amazon Link</span>
+                                                                            @elseif($assess->type==2)
+                                                                                <span>Youtube Link</span>
+                                                                            @elseif($assess->type==3)
+                                                                                <span>Local Video</span>
+                                                                            @elseif($assess->type==4)
+                                                                                <span>Scorm Video</span>
+                                                                            @elseif($assess->type==5)
+                                                                                <span>Attachments</span>
+                                                                            @elseif($assess->type==6)
+                                                                                <span>Assessment</span>
+                                                                            @elseif($assess->type==7)
+                                                                                <span>Assignment</span>
+                                                                            @endif
+                                                                        </td>
+                                                                        <td>{{ $displayName }}</td>
+                                                                        <td>
+                                                                            @if($assess->type==5)
+                                                                                <a class="web-btn-sm" href="{{url('storage/app/public/'.$assess->file_path)}}" target="_blank"><span>View File</span></a>
+                                                                            @elseif($assess->type == 3 || $assess->type == 4)
+                                                                                {{ basename($assess->file_path) }}
+                                                                            @else
+                                                                                {{ $assess->file_path }}
+                                                                            @endif
+                                                                        </td>
+                                                                        <td>
+                                                                            <div class="custom-control custom-switch">
+                                                                                <input type="checkbox" class="custom-control-input toggle-classdocument document-toggle" id="toggle-document-{{ $assess->id }}" data-document_id="{{ $assess->id }}" @if($assess->is_active) checked @endif>
+                                                                                <label class="custom-control-label" for="toggle-document-{{ $assess->id }}"></label>
+                                                                            </div>
+                                                                            <span class="d-block" style="font-size: 11px;">Expries on: {{ $assess->expiration_date && $assess->expiration_date != '1970-01-01 00:00:00' ? date('d/m/Y', strtotime($assess->expiration_date)) : 'N/A' }}</span>
+                                                                        </td>
+                                                                        <td>
+                                                                            @if($assess->type == 6)
+                                                                                <button type="button" class="btn btn-sm btn-outline-warning reassign-assessment-all" data-assessment-id="{{ $assess->id }}" data-assessment-name="{{ $displayName }}" {{ !$assess->is_active ? 'disabled' : '' }}>Reassign to All</button>
+                                                                            @endif
+                                                                        </td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            @else
+                                                                <tr>
+                                                                    <td colspan="5" class="text-center text-muted" style="font-size: 12px;">No content found for this sub course.</td>
+                                                                </tr>
+                                                            @endif
+                                                        @endforeach
+                                                    @else
+                                                        <tr>
+                                                            <td colspan="5" class="text-center text-muted">No sub courses found</td>
+                                                        </tr>
+                                                    @endif
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
 
 
                 </div>
             </div>
-
-            <div class="modal fade" id="excel_upload" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="excel--upload" aria-hidden="true">
+<div class="modal fade" id="excel_upload" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="excel--upload" aria-hidden="true">
                 <div class="modal-dialog" role="document">
                     <div class="modal-content">
                         <div class="modal-header">
@@ -1164,20 +1271,29 @@
                 //     }
                 // });
                     $(document).ready(function() {
-                             if (!$('#toggleInactive').is(':checked')) {
-                                    $('#upload_files_list tr.inactive').hide();
-                                }
+                        // Main Course inactive toggle
+                        if (!$('#toggleInactive').is(':checked')) {
+                            $('#upload_files_list tr.inactive').hide();
+                        }
+                        $('body').off('change.toggleInactive', '#toggleInactive').on('change.toggleInactive', '#toggleInactive', function() {
+                            if ($(this).is(':checked')) {
+                                $('#upload_files_list tr.inactive').show();
+                            } else {
+                                $('#upload_files_list tr.inactive').hide();
+                            }
+                        });
 
-                                // Handle checkbox change event
-                                $('#toggleInactive').change(function() {
-                                    if ($(this).is(':checked')) {
-                                        // Show inactive rows when checkbox is checked
-                                        $('#upload_files_list tr.inactive').show();
-                                    } else {
-                                        // Hide inactive rows when checkbox is unchecked
-                                        $('#upload_files_list tr.inactive').hide();
-                                    }
-                                });
+                        // Sub Courses inactive toggle
+                        if (!$('#toggleInactiveSub').is(':checked')) {
+                            $('#upload_sub_files_list tr.inactive').hide();
+                        }
+                        $('body').off('change.toggleInactiveSub', '#toggleInactiveSub').on('change.toggleInactiveSub', '#toggleInactiveSub', function() {
+                            if ($(this).is(':checked')) {
+                                $('#upload_sub_files_list tr.inactive').show();
+                            } else {
+                                $('#upload_sub_files_list tr.inactive').hide();
+                            }
+                        });
 
 
                                 $('body').on('click','.get_certificates',function(){
@@ -1219,13 +1335,14 @@
 
 
         // delete course modal.
-        $(document).on('click', '.course-delete-btn', function() {
-             const courseId = $(this).data('id');
-            //  console.log(courseId);
+        $(document).off('click', '.course-delete-btn').on('click', '.course-delete-btn', function() {
+            const courseId = $(this).data('id');
             const courseName = $(this).data('name');
+            const parentId = $(this).data('parent-id');
 
             $('#courseName').text(courseName);
             $('#courseId').val(courseId);
+            $('#deleteCourseModal').data('parent-id', parentId || '');
             
             $('#deleteCourseModal').modal('show');
         });

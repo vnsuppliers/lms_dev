@@ -80,22 +80,28 @@ class Asigneduser extends Model
      * 3. Courses with only assessments: all active assessments must be passed.
      * If any assessment is reassigned (attempt reset), returns false until passed again.
      */
-    public function isCompletedAndPassed(): bool
+    public function isCompletedAndPassed($preloadedResults = null, $preloadedExamAttempts = null): bool
     {
         $courseId = $this->course_id;
         if (!$courseId) {
             return false;
         }
 
+        $courseIds = [$courseId];
+        $subCourseIds = Courses::where('parent_id', $courseId)->where('active', 1)->where('is_delete', 0)->pluck('id')->toArray();
+        if (!empty($subCourseIds)) {
+            $courseIds = array_merge($courseIds, $subCourseIds);
+        }
+
         // 1. Active Assessments (type 6)
-        $activeAssessments = Course_documents::where('course_id', $courseId)
+        $activeAssessments = Course_documents::whereIn('course_id', $courseIds)
             ->where('type', 6)
             ->where('is_delete', 0)
             ->where('is_active', 1)
             ->get();
 
         // 2. Active Assignments (type 7)
-        $activeAssignments = Course_documents::where('course_id', $courseId)
+        $activeAssignments = Course_documents::whereIn('course_id', $courseIds)
             ->where('type', 7)
             ->where('is_delete', 0)
             ->where(function ($q) {
@@ -106,18 +112,55 @@ class Asigneduser extends Model
         $hasAssessments = $activeAssessments->isNotEmpty();
         $hasAssignments = $activeAssignments->isNotEmpty();
 
-        // If course has neither assessments nor assignments, rely on assigned status
+        // A course must have at least one active assessment or assignment (exam) to be completed and passed
         if (!$hasAssessments && !$hasAssignments) {
-            return (int) $this->status === 3;
+            return false;
         }
 
         // If course has assessments, every active assessment must have at least one passing attempt
         if ($hasAssessments) {
             foreach ($activeAssessments as $assessment) {
-                $passed = Assessment_results::where('course_document_id', $assessment->id)
-                    ->where('assign_id', $this->id)
-                    ->get()
-                    ->contains(fn ($res) => $res->hasPassed());
+                // 1. Direct check by current document ID
+                if ($preloadedResults !== null) {
+                    $passed = $preloadedResults->where('course_document_id', $assessment->id)
+                        ->filter(fn ($res) => ((int)$res->assign_id === (int)$this->id) || ((int)$res->user_id === (int)$this->user_id))
+                        ->contains(fn ($res) => $res->hasPassed());
+                } else {
+                    $passed = Assessment_results::where('course_document_id', $assessment->id)
+                        ->where(function ($q) {
+                            $q->where('assign_id', $this->id)->orWhere('user_id', $this->user_id);
+                        })
+                        ->whereNull('deleted_at')
+                        ->get()
+                        ->contains(fn ($res) => $res->hasPassed());
+                }
+
+                // 2. Fallback: If assessment document was revised/re-uploaded, check previous documents of same course/name
+                if (!$passed) {
+                    $matchingDocIds = Course_documents::whereIn('course_id', $courseIds)
+                        ->where('type', 6)
+                        ->where('is_delete', 0)
+                        ->where(function ($q) use ($assessment) {
+                            $q->where('id', $assessment->id)
+                              ->orWhere('file_name', $assessment->file_name);
+                        })
+                        ->pluck('id')
+                        ->toArray();
+
+                    if ($preloadedResults !== null) {
+                        $passed = $preloadedResults->whereIn('course_document_id', $matchingDocIds)
+                            ->filter(fn ($res) => ((int)$res->assign_id === (int)$this->id) || ((int)$res->user_id === (int)$this->user_id))
+                            ->contains(fn ($res) => $res->hasPassed());
+                    } else {
+                        $passed = Assessment_results::whereIn('course_document_id', $matchingDocIds)
+                            ->where(function ($q) {
+                                $q->where('assign_id', $this->id)->orWhere('user_id', $this->user_id);
+                            })
+                            ->whereNull('deleted_at')
+                            ->get()
+                            ->contains(fn ($res) => $res->hasPassed());
+                    }
+                }
 
                 if (!$passed) {
                     return false;
@@ -138,16 +181,22 @@ class Asigneduser extends Model
                     return false;
                 }
 
-                $passed = ExamAttempt::where('exam_id', $exam->id)
-                    ->where(function ($q) {
-                        $q->where('assigned_id', $this->id)
-                          ->orWhere(function ($sub) {
-                              $sub->where('user_id', $this->user_id)
-                                  ->where('course_id', $this->course_id);
-                          });
-                    })
-                    ->whereRaw('LOWER(exam_result) = ?', ['passed'])
-                    ->exists();
+                if ($preloadedExamAttempts !== null) {
+                    $passed = $preloadedExamAttempts->where('exam_id', $exam->id)
+                        ->filter(fn ($att) => ((int)$att->assigned_id === (int)$this->id) || (((int)$att->user_id === (int)$this->user_id) && in_array($att->course_id, $courseIds)))
+                        ->contains(fn ($att) => strtolower(trim($att->exam_result ?? '')) === 'passed');
+                } else {
+                    $passed = ExamAttempt::where('exam_id', $exam->id)
+                        ->where(function ($q) use ($courseIds) {
+                            $q->where('assigned_id', $this->id)
+                              ->orWhere(function ($sub) use ($courseIds) {
+                                  $sub->where('user_id', $this->user_id)
+                                      ->whereIn('course_id', $courseIds);
+                              });
+                        })
+                        ->whereRaw('LOWER(exam_result) = ?', ['passed'])
+                        ->exists();
+                }
 
                 if (!$passed) {
                     return false;

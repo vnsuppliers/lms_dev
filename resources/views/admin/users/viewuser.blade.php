@@ -2449,14 +2449,17 @@
 
         $(document).on('change', '.report-assessment-select', function(e) {
             e.stopPropagation();
-            var card = $(this).closest('.report-stat-card');
-            var optionsMap = card.data('assessment-options');
+            var $sel = $(this);
+            var card = $sel.closest('.report-stat-card');
+            var optionsMap = card.data('assessment-options') || card.attr('data-assessment-options');
             if (typeof optionsMap === 'string') {
                 try { optionsMap = JSON.parse(optionsMap); } catch (err) {}
             }
-            var selectedKey = $(this).val();
+            var selectedKey = $sel.val();
             var data = optionsMap ? optionsMap[selectedKey] : null;
             if (!data) return;
+
+            $sel.attr('title', data.name || '');
 
             card.find('.report-stat-attempts').text(data.attempts);
 

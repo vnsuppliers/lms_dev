@@ -221,6 +221,7 @@
     </div>
 
     <!-- Alert Notifications -->
+    <div id="ajaxAlertPlaceholder"></div>
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="fa-solid fa-circle-check me-2"></i> {{ session('success') }}
@@ -326,7 +327,7 @@
 
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table custom-reports-table align-middle">
+                <table class="table custom-reports-table align-middle" id="savedReportsTable">
                     <thead>
                         <tr>
                             <th style="width: 50px;">#</th>
@@ -338,7 +339,7 @@
                             <th class="text-end" style="min-width: 240px;">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="savedReportsTableBody">
                         @forelse($reports as $report)
                             @php
                                 $cfg = $report->configuration ?? [];
@@ -348,7 +349,7 @@
                                     : (str_contains($report->data_source ?? '', ',') ? array_filter(array_map('trim', explode(',', $report->data_source))) : [$report->data_source]);
                                 $isMulti = count($rawSources) > 1;
                             @endphp
-                            <tr>
+                            <tr id="report-row-{{ $report->id }}">
                                 <td class="text-muted fw-semibold">{{ $loop->iteration + ($reports->currentPage() - 1) * $reports->perPage() }}</td>
                                 <td>
                                     <div class="fw-bold text-dark fs-6" style="color: #0f172a !important;">{{ $report->name }}</div>
@@ -433,9 +434,13 @@
                                                 </li>
                                             </ul>
                                         </div>
-                                        <form action="{{ route('admin.reports.destroy', $report->id) }}" method="POST" class="d-inline mb-0" onsubmit="return confirm('Are you sure you want to delete this saved report?');">
+                                        <form action="{{ route('admin.reports.destroy', $report->id) }}" method="POST" class="d-inline mb-0 delete-report-form" data-report-id="{{ $report->id }}">
                                             @csrf
                                             @method('DELETE')
+                                            <input type="hidden" name="page" value="{{ request('page', 1) }}">
+                                            <input type="hidden" name="search" value="{{ request('search', '') }}">
+                                            <input type="hidden" name="data_source" value="{{ request('data_source', '') }}">
+                                            <input type="hidden" name="per_page" value="{{ request('per_page', '') }}">
                                             <button type="submit" class="btn btn-action-delete" title="Delete Report">
                                                 <i class="fa-solid fa-trash-can"></i>
                                             </button>
@@ -509,6 +514,55 @@
                         }
                     }])
                 });
+            }
+        });
+    });
+
+    // Handle AJAX Delete so user stays on current page (e.g., page 10)
+    $(document).on('submit', '.delete-report-form', function(e) {
+        e.preventDefault();
+        var $form = $(this);
+        var reportId = $form.data('report-id');
+        var $row = $('#report-row-' + reportId);
+
+        if (!confirm('Are you sure you want to delete this saved report?')) {
+            return false;
+        }
+
+        var $btn = $form.find('button[type="submit"]');
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: $form.attr('action'),
+            type: 'POST',
+            data: $form.serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response && response.success) {
+                    var remainingRows = $('#savedReportsTableBody tr[id^="report-row-"]').length;
+                    if (remainingRows > 1) {
+                        $row.fadeOut(250, function() {
+                            $(this).remove();
+                        });
+                        var alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                            '<i class="fa-solid fa-circle-check me-2"></i> ' + (response.message || 'Report deleted successfully.') +
+                            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                            '</div>';
+                        $('#ajaxAlertPlaceholder').html(alertHtml);
+                    } else {
+                        // If this was the last row on page 10, navigate to previous page (page 9) gracefully
+                        window.location.href = response.redirect_url || window.location.href;
+                    }
+                } else {
+                    window.location.reload();
+                }
+            },
+            error: function() {
+                // If AJAX fails, submit standard form (which still sends page=10)
+                $form.off('submit').submit();
             }
         });
     });

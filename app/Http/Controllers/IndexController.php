@@ -66,14 +66,16 @@ $certificates = Certificate::get();
 $roles = Roles::get();
 
     // Build Courses Query
-    $courses_lists = Courses::withCount('Assigned_usersdetails')->with([
+    $courses_lists = Courses::withCount(['Assigned_usersdetails', 'sub_courses'])->with([
         'category_details',
+        'sub_courses',
         'documents_details' => function ($q) {
             $q->where('type', 6)
             ->where('is_active', 1)
             ->where('is_delete', 0);
         }
     ])
+    ->whereNull('parent_id')
     ->when(!empty($request->input('category_id', [])), function ($query) use ($request) {
         $query->whereHas('category_details', fn($q) => $q->whereIn('id', $request->input('category_id')));
     })
@@ -145,10 +147,16 @@ $levels = Level::get();
 $groups_lists = Group::get();
 $category_all_list = Category::get();
 
+$parent_course = null;
+if ($request->filled('parent_course_id')) {
+    $parent_course = Courses::find($request->parent_course_id);
+} elseif (!empty($courses_id->parent_id)) {
+    $parent_course = Courses::find($courses_id->parent_id);
+}
 
        //dd('hii');
    
-        return view('admin.coursecatalog.course_catalog',compact('category_list','data_id','sub_id','sub_data','courses_lists','users_lists','lastCourse','sub_category_list','courses_id','request','goals','levels','designations','departments','trainers_data','certificates','groups_lists','roles','category_department','category_all_list'));
+        return view('admin.coursecatalog.course_catalog',compact('category_list','data_id','sub_id','sub_data','courses_lists','users_lists','lastCourse','sub_category_list','courses_id','request','goals','levels','designations','departments','trainers_data','certificates','groups_lists','roles','category_department','category_all_list','parent_course'));
     }
     public function category_store(Request $request){
         //dd($request->all());

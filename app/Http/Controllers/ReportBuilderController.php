@@ -222,12 +222,70 @@ class ReportBuilderController extends Controller
     }
 
     /**
-     * Delete saved report.
+     * Delete saved report while staying on the current pagination page.
      */
-    public function destroy(Report $report)
+    public function destroy(Request $request, Report $report)
     {
         $report->delete();
-        return redirect()->route('admin.reports.index')->with('success', 'Report deleted successfully.');
+
+        // Retrieve current pagination page and query parameters
+        $page = (int) $request->input('page', $request->query('page', 1));
+        $perPage = (int) $request->input('per_page', $request->query('per_page', 10));
+        if ($perPage <= 0) {
+            $perPage = 10;
+        }
+
+        // Count remaining records under the same filters to prevent landing on an empty page
+        $query = Report::query();
+        if ($request->filled('data_source')) {
+            $ds = $request->input('data_source');
+            $query->where(function ($q) use ($ds) {
+                $q->where('data_source', $ds)
+                  ->orWhere('data_source', 'LIKE', "%,{$ds}%")
+                  ->orWhere('data_source', 'LIKE', "{$ds},%")
+                  ->orWhere('data_source', 'LIKE', "%,{$ds},%");
+            });
+        }
+        if ($request->filled('search')) {
+            $term = $request->input('search');
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'LIKE', "%{$term}%")
+                  ->orWhere('description', 'LIKE', "%{$term}%");
+            });
+        }
+
+        $totalRemaining = $query->count();
+        $maxPage = max(1, (int) ceil($totalRemaining / $perPage));
+        if ($page > $maxPage) {
+            $page = $maxPage;
+        }
+
+        $redirectParams = [];
+        if ($page > 1) {
+            $redirectParams['page'] = $page;
+        }
+        if ($request->filled('search')) {
+            $redirectParams['search'] = $request->input('search');
+        }
+        if ($request->filled('data_source')) {
+            $redirectParams['data_source'] = $request->input('data_source');
+        }
+        if ($request->filled('per_page') && (int)$request->input('per_page') !== 10) {
+            $redirectParams['per_page'] = $request->input('per_page');
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Report deleted successfully.',
+                'remaining' => $totalRemaining,
+                'page' => $page,
+                'redirect_url' => route('admin.reports.index', $redirectParams)
+            ]);
+        }
+
+        return redirect()->route('admin.reports.index', $redirectParams)
+            ->with('success', 'Report deleted successfully.');
     }
 
     /**
